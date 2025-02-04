@@ -495,7 +495,7 @@ Mapping statistics were obtained with *Qualimap* v.2.2.2-dev [@okonechnikovQuali
 
 ## General information
 
-This document was last updated at `r Sys.time()` using R Markdown (built with `r R.version.string`). The source code for this website can be found on <https://github.com/IdoBar/QX_bioinfo_analysis/tree/genome>.
+This document was last updated at `r Sys.time()` using R Markdown (built with `r R.version.string`). The source code for this website can be found on <https://github.com/IdoBar/HPC_SNP_calling_documentation>.
 
 Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. It is especially powerful at authoring documents and reports which include code and can execute code and use the results in the output. For more details on using R Markdown see <http://rmarkdown.rstudio.com>, [R Markdown: The Definitive Guide](https://bookdown.org/yihui/rmarkdown/) and [Rmarkdown cheatsheet](https://rstudio.github.io/cheatsheets/html/rmarkdown.html).
 
