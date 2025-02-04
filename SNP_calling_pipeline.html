@@ -3685,7 +3685,7 @@ Mapping quality was assessed with Qualimap v.2.2.2-dev <span class="citation">(O
 <span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a><span class="co"># Done!</span></span>
 <span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a></span>
 <span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a><span class="co"># Copy html files to SharePoint</span></span>
-<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a><span class="ex">rclone</span> copy <span class="at">-P</span> <span class="va">$RUN_DIR</span> GRDC_rabiei:General/Projects/Hayley_PhD/Genetics/Murdoch_WGRS/SNP_calling_24_01_2025</span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a><span class="ex">rclone</span> copy <span class="at">-P</span> <span class="at">--exclude</span> <span class="st">&quot;**/*.html&quot;</span> <span class="va">$RUN_DIR</span> GRDC_rabiei:General/Projects/Hayley_PhD/Genetics/Murdoch_WGRS/SNP_calling_24_01_2025</span>
 <span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a><span class="co"># Copy html files to SharePoint</span></span>
 <span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a><span class="ex">rclone</span> copy <span class="at">-P</span> <span class="at">--ignore-checksum</span> <span class="at">--ignore-size</span> <span class="at">--include</span> <span class="st">&quot;**/*.html&quot;</span> <span class="va">$RUN_DIR</span> GRDC_rabiei:General/Projects/Hayley_PhD/Genetics/Murdoch_WGRS/SNP_calling_24_01_2025</span></code></pre></div>
 </div>
@@ -3778,11 +3778,7 @@ We will test different alignment tools and parameters (<code>BWA-MEM2</code>, <c
 </div>
 <div id="general-information" class="section level2">
 <h2>General information</h2>
-<<<<<<< HEAD
-<p>This document was last updated at 2025-02-05 01:57:55 using R Markdown (built with R version 4.2.1 (2022-06-23 ucrt)). The source code for this website can be found on <a href="https://github.com/IdoBar/HPC_SNP_calling_documentation" class="uri">https://github.com/IdoBar/HPC_SNP_calling_documentation</a>.</p>
-=======
-<p>This document was last updated at 2025-02-05 02:08:17 using R Markdown (built with R version 4.2.1 (2022-06-23 ucrt)). The source code for this website can be found on <a href="https://github.com/IdoBar/HPC_SNP_calling_documentation" class="uri">https://github.com/IdoBar/HPC_SNP_calling_documentation</a>.</p>
->>>>>>> 61392df (Updated links to GH page and main filenames)
+<p>This document was last updated on 05 February 2025 using R Markdown (built with R version 4.2.1 (2022-06-23 ucrt)). The source code for this website can be found on <a href="https://github.com/IdoBar/HPC_SNP_calling_documentation" class="uri">https://github.com/IdoBar/HPC_SNP_calling_documentation</a>.</p>
 <p>Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. It is especially powerful at authoring documents and reports which include code and can execute code and use the results in the output. For more details on using R Markdown see <a href="http://rmarkdown.rstudio.com" class="uri">http://rmarkdown.rstudio.com</a>, <a href="https://bookdown.org/yihui/rmarkdown/">R Markdown: The Definitive Guide</a> and <a href="https://rstudio.github.io/cheatsheets/html/rmarkdown.html">Rmarkdown cheatsheet</a>.</p>
 <hr />
 </div>
