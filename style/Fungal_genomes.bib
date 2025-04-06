@@ -1,3 +1,32 @@
+@online{clearyComparingVariantCall2015,
+  title = {Comparing {{Variant Call Files}} for {{Performance Benchmarking}} of {{Next-Generation Sequencing Variant Calling Pipelines}}},
+  author = {Cleary, John G. and Braithwaite, Ross and Gaastra, Kurt and Hilbush, Brian S. and Inglis, Stuart and Irvine, Sean A. and Jackson, Alan and Littin, Richard and Rathod, Mehul and Ware, David and Zook, Justin M. and Trigg, Len and Vega, Francisco M. De La},
+  date = {2015-08-03},
+  eprinttype = {bioRxiv},
+  eprintclass = {New Results},
+  pages = {023754},
+  doi = {10.1101/023754},
+  abstract = {Summary To evaluate and compare the performance of variant calling methods and their confidence scores, comparisons between a test call set and a ``gold standard'' need to be carried out. Unfortunately, these comparisons are not straightforward with the current Variant Call Files (VCF), which are the standard output of most variant calling algorithms for high-throughput sequencing data. Comparisons of VCFs are often confounded by the different representations of indels, MNPs, and combinations thereof with SNVs in complex regions of the genome, resulting in misleading results. A variant caller is inherently a classification method designed to score putative variants with confidence scores that could permit controlling the rate of false positives (FP) or false negatives (FN) for a given application. Receiver operator curves (ROC) and the area under the ROC (AUC) are efficient metrics to evaluate a test call set versus a gold standard. However, in the case of VCF data this also requires a special accounting to deal with discrepant representations. We developed a novel algorithm for comparing variant call sets that deals with complex call representation discrepancies and through a dynamic programing method that minimizes false positives and negatives globally across the entire call sets for accurate performance evaluation of VCFs. Availability RTG Tools is implemented as a multithreaded Java application and source code is available under BSD license at: https://github.com/RealTimeGenomics/rtg-tools Contact len\{at\}realtimegenomics.com},
+  langid = {english},
+  pubstate = {prepublished}
+}
+
+@article{liComparingGenomicVariant2023,
+  title = {Comparing Genomic Variant Identification Protocols for {{{\mkbibemph{Candida auris}}}}},
+  author = {Li, Xiao and Mu\~noz, Jos\'e F. and Gade, Lalitha and Argimon, Silvia and Bougnoux, Marie-Elisabeth and Bowers, Jolene R. and Chow, Nancy A. and Cuesta, Isabel and Farrer, Rhys A. and Maufrais, Corinne and Monroy-Nieto, Juan and Pradhan, Dibyabhaba and Uehling, Jessie and Vu, Duong and Yeats, Corin A. and Aanensen, David M. and family=Enfert, given=Christophe, prefix=d', useprefix=true and Engelthaler, David M. and Eyre, David W. and Fisher, Matthew C. and Hagen, Ferry and Meyer, Wieland and Singh, Gagandeep and Alastruey-Izquierdo, Ana and Litvintseva, Anastasia P. and Cuomo, Christina A.},
+  date = {2023-04-12},
+  journaltitle = {Microbial Genomics},
+  shortjournal = {Microb. Genom.},
+  volume = {9},
+  number = {4},
+  pages = {000979},
+  publisher = {Microbiology Society,},
+  issn = {2057-5858},
+  doi = {10.1099/mgen.0.000979},
+  abstract = {Genomic analyses are widely applied to epidemiological, population genetic and experimental studies of pathogenic fungi. A wide range of methods are employed to carry out these analyses, typically without including controls that gauge the accuracy of variant prediction. The importance of tracking outbreaks at a global scale has raised the urgency of establishing high-accuracy pipelines that generate consistent results between research groups. To evaluate currently employed methods for whole-genome variant detection and elaborate best practices for fungal pathogens, we compared how 14 independent variant calling pipelines performed across 35               Candida auris               isolates from 4 distinct clades and evaluated the performance of variant calling, single-nucleotide polymorphism (SNP) counts and phylogenetic inference results. Although these pipelines used different variant callers and filtering criteria, we found high overall agreement of SNPs from each pipeline. This concordance correlated with site quality, as SNPs discovered by a few pipelines tended to show lower mapping quality scores and depth of coverage than those recovered by all pipelines. We observed that the major differences between pipelines were due to variation in read trimming strategies, SNP calling methods and parameters, and downstream filtration criteria. We calculated specificity and sensitivity for each pipeline by aligning three isolates with chromosomal level assemblies and found that the GATK-based pipelines were well balanced between these metrics. Selection of trimming methods had a greater impact on SAMtools-based pipelines than those using GATK. Phylogenetic trees inferred by each pipeline showed high consistency at the clade level, but there was more variability between isolates from a single outbreak, with pipelines that used more stringent cutoffs having lower resolution. This project generated two truth datasets useful for routine benchmarking of               C. auris               variant calling, a consensus VCF of genotypes discovered by 10 or more pipelines across these 35 diverse isolates and variants for 2 samples identified from whole-genome alignments. This study provides a foundation for evaluating SNP calling pipelines and developing best practices for future fungal genomic studies.},
+  langid = {american}
+}
+
 @article{rudenUsingDrosophilaMelanogaster2012,
   title = {Using {{{\emph{Drosophila}}}}{\emph{ Melanogaster}} as a Model for Genotoxic Chemical Mutational Studies with a New Program, {{SnpSift}}},
   author = {Ruden, Douglas Mark and Cingolani, Pablo and Patel, Viral M. and Coon, Melissa and Nguyen, Tung and Land, Susan J. and Lu, Xiangyi},

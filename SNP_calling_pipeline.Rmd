@@ -35,13 +35,13 @@ knitr::opts_chunk$set(list(echo = TRUE, eval=FALSE, message=FALSE))
 
 # remotes::install_github(c("ropensci/tabulizerjars", "ropensci/tabulizer"), INSTALL_opts = "--no-multiarch")
  # CRAN settings
-chooseCRANmirror(ind=1)
-options(repos = getOption("repos")["CRAN"]) # fix the annoying "unable to access index..."
-req_pacs <- c("tidyverse", 'readxl', 'scales', 'janitor', 'paletteer', 'VariantAnnotation', "cn.mops", "htmltools", "bookdown",
-              'ggrepel', 'here',  'DT', 'plotly', 'mmod', 'poppr', 'circlize', "downloadthis", "tabulizer", "htmltab/htmltab", 'Mikata-Project/ggthemr')
+#chooseCRANmirror(ind=1)
+#options(repos = getOption("repos")["CRAN"]) # fix the annoying "unable to access index..."
+#req_pacs <- c("tidyverse", 'readxl', 'scales', 'janitor', 'paletteer', 'VariantAnnotation', "cn.mops", "htmltools", "bookdown",
+#              'ggrepel', 'here',  'DT', 'plotly', 'mmod', 'poppr', 'circlize', "downloadthis", "tabulizer", "htmltab/htmltab", 'Mikata-Project/ggthemr')
 
-pak::pak(req_pacs)
-pacman::p_load(basename(req_pacs), install = FALSE, update =FALSE)
+#pak::pak(req_pacs)
+#pacman::p_load(basename(req_pacs), install = FALSE, update =FALSE)
 ```
 
 
@@ -220,41 +220,37 @@ Mapping quality was assessed with Qualimap v.2.2.2-dev [@okonechnikovQualimapAdv
 
 ```{bash process-align-reads}
 # setup workspace
-CONDA_NAME=genomics                                                                           REF_DIR="/scratch/project/adna/A_rabiei/A_rabiei_TECAN_2022/ref_genome"
+CONDA_NAME="genomics" 
+REF_DIR="/scratch/project/adna/A_rabiei/A_rabiei_TECAN_2022/ref_genome"
 GENOME="$REF_DIR/ArME14_v2_CCDM"
 WORK_DIR="/scratch/project/adna/A_rabiei/Murdoch_WGRS"
-FQ_DIR="$WORK_DIR/fungal"
+FQ_DIR="$WORK_DIR/fungaldata"
+ln -s $WORK_DIR/fungal/*.fq.gz $FQ_DIR/
+ISOLATES="Ar0020|Ar0023|Ar0212|AR0242|AR0052|AR0210|AR0022|AR0128"
+find /scratch/project/adna/A_rabiei/AGRF_CAGRF20114478 -name "*.fastq.gz" | egrep -i $ISOLATES | parallel --dry-run --rpl  "{target} s:.+\/(.+?)_H3HGFDSX2_[CATG-]+_L002_R([12]).fastq.gz:\1.R\2.fq.gz:" ln -s {} $FQ_DIR/{target}
+# _H3HGFDSX2_CCTCCGGTTG-TGGTGTTATG_L002_R2.fastq.gz
+
 DATE=$(date +%d_%m_%Y)
-RUN_DIR=$WORK_DIR/SNP_calling_${DATE}
-mkdir -p $RUN_DIR/aligned_reads && mkdir -p $RUN_DIR/trimmed_reads/QC && cd $RUN_DIR
-NCORES=12
-MEM=64
-WALLTIME="2:00:00"
-JOBNAME="process_reads"
-# create commands
-find $FQ_DIR/*.R1.fq.gz | parallel -k --dry-run --rpl "{file2} s:.R1:.R2:; uq()" --rpl "{sample} s:.+\/(.+?).R1.fq.gz:\1:"  "fastp -i {}
--I {file2} --detect_adapter_for_pe -c -l 30 -p -w \$SLURM_CPUS_PER_TASK -z 7 -o $RUN_DIR/trimmed_reads/{sample}_R1.trimmed.fastq.gz -O $RUN_DIR/
-trimmed_reads/{sample}_R2.trimmed.fastq.gz -j $RUN_DIR/trimmed_reads/QC/{sample}.fastp.json" > $JOBNAME.cmds
-
-# submit to the cluster
-sbatch -a 1-$(cat $RUN_DIR/$JOBNAME.cmds | wc -l)%10 --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=
-ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/array.slurm
-
-JOBNAME="bwa-mem-align"
+RUN_DIR=$WORK_DIR/FB_SNP_calling_${DATE}
+BAM_DIR="$RUN_DIR/aligned_reads"
+mkdir -p $BAM_DIR $FQ_DIR/trimmed_reads/QC && cd $RUN_DIR
 NCORES=12
 MEM=96
-WALLTIME="1:00:00"
+WALLTIME="3:00:00"
+RGPM="DNBseq_T7"
+RGPL="ILLUMINA"
+RGPU="E250038400"
+RGCN="MU_SABC"
 
-# Create the bwa-mem2 commands to align all read pairs.
-find $RUN_DIR/trimmed_reads -name "*_R1.trimmed.fastq.gz" | parallel -k --dry-run --rpl "{file2} s:_R1:_R2:" --rpl "{sample} s:.+\/(.+?)_
-R1.+:\1:"  "ALIGN_DIR=$RUN_DIR/aligned_reads && bwa-mem2 mem -R \"@RG\tID:{1 sample}\tSM:{1 sample}\tLB:{1 sample}\tPU:E250038400\tPL:DNBseq_T7\
-tCN:MU_SABC\" -t \$[SLURM_CPUS_PER_TASK - 2] $GENOME.fa {1} {file2} | bamsormadup tmpfile=/scratch/project/adna/tmp/bamsormadup_\$(hostname) inp
-utformat=sam threads=\$[SLURM_CPUS_PER_TASK - 2] > \$ALIGN_DIR/{sample}.dedup.rg.csorted.bam; unset DISPLAY; qualimap bamqc -bam \$ALIGN_DIR/{sa
-mple}.dedup.rg.csorted.bam --java-mem-size=32G -c -gff $GENOME.bed -outdir \$ALIGN_DIR/{sample}_bamqc"  > $RUN_DIR/$JOBNAME.cmds
+
+JOBNAME="Murdoch-fastp-bwa"
+
+
+find $FQ_DIR/*.R1.fq.gz | parallel -k --dry-run --rpl "{file2} s:.R1:.R2:; uq()" --rpl "{sample} s:.+\/(.+?).R1.fq.gz:\1:"  "fastp -i {} -I {file2} --detect_adapter_for_pe -c -l 30 -p -w \$SLURM_CPUS_PER_TASK -z 7 -o $FQ_DIR/trimmed_reads/{sample}_R1.trimmed.fastq.gz -O $FQ_DIR/trimmed_reads/{sample}_R2.trimmed.fastq.gz -j $FQ_DIR/trimmed_reads/QC/{sample}.fastp.json && bwa-mem2 mem -R \"@RG\tID:{sample}\tSM:{sample}\tLB:{sample}\tPU:$RGPU\tPL:$RGPL\tPM:$RGPM\tCN:$RGCN\" -t \$[SLURM_CPUS_PER_TASK - 2] $GENOME.fa $FQ_DIR/trimmed_reads/{sample}_R1.trimmed.fastq.gz $FQ_DIR/trimmed_reads/{sample}_R2.trimmed.fastq.gz | bamsormadup tmpfile=\$TMPDIR/bamsormadup_\$(hostname)_\$SLURM_ARRAY_JOB_ID inputformat=sam threads=\$[SLURM_CPUS_PER_TASK - 2] indexfilename=$BAM_DIR/{sample}.dedup.rg.csorted.bam.bai > $BAM_DIR/{sample}.dedup.rg.csorted.bam ; qualimap bamqc -bam $BAM_DIR/{sample}.dedup.rg.csorted.bam --java-mem-size=32G -c -gff $GENOME.bed -outdir $BAM_DIR/{sample}_bamqc"  > $RUN_DIR/$JOBNAME.cmds
 
 # submit to the cluster
-sbatch -a 1-$(cat $RUN_DIR/$JOBNAME.cmds | wc -l)%10 --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=
-ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/array.slurm
+ARRAY_ID=$(sbatch -a 1-$(cat $RUN_DIR/$JOBNAME.cmds | wc -l) --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/array.slurm | cut -f 4)
+
 ```
 
 ### Calling variants (using Freebayes)
@@ -262,14 +258,19 @@ ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/array.slurm
 We used Freebayes *v1.3.5* [@garrisonHaplotypebasedVariantDetection2012a] to assign variant probability scores and call variants. Notice that we used diploid mode (`-p 2`) despite _A. rabiei_ being haploid, to be able to identify loci wrongly called as heterozygotes which indicates a mapping issue. We also added the flag `--genotype-qualities` to be able to filter the resulting vcf file based on genotype qualities (`GQ`). 
 
 ```{bash call-variants-murdoch-wgrs}
-WORK_DIR=/scratch/project/adna/A_rabiei
-RUN_DIR=$WORK_DIR/A_rabiei_TECAN_2022
+WORK_DIR="/scratch/project/adna/A_rabiei/Murdoch_WGRS"
+RUN_DIR="$WORK_DIR/SNP_calling_04_04_2025"
+FQ_DIR="$WORK_DIR/fungaldata"
 GENOME="$WORK_DIR/A_rabiei_TECAN_2022/ref_genome/ArME14_v2_CCDM"
 CONDA_NAME=genomics
-NCORES=16
-MEM=96
-WALLTIME="50:00:00"
+
 BAM_DIR=$RUN_DIR/aligned_reads
+
+# bring in BAM files (if not prepared in the previous step)
+# select isolates
+ISOLATES="Ar0020|Ar0023|Ar0212|AR0242|AR0052|AR0210|AR0022|AR0128"
+find /scratch/project/adna/A_rabiei/AGRF_gatk_13_03_2025/aligned_reads -maxdepth 1 -name "*.rg.csorted.bam*" | egrep -i $ISOLATES | parallel ln -s {} $BAM_DIR/
+ln -s /scratch/project/adna/A_rabiei/Murdoch_WGRS/GATK_Murdoch_WGRS_04_04_2025/aligned_reads/*.rg.csorted.bam* $BAM_DIR/
 
 # Distributed freebayes (each node runs freebayes-parallel on one contig)
 # download script
@@ -285,67 +286,44 @@ find $CONDA_PREFIX -name "libtabixpp.so*" | parallel ln -s {} {.}.0
 # split each contig/chromosome to smaller 1e6 bits
 # prepare BAM files
 JOBNAME="prep_bams"
+NCORES=2
+MEM=16
+WALLTIME="1:00:00"
 # submit it as a Slurm job
-echo "ls -1 $BAM_DIR/*.rg.csorted.bam | parallel -j2 sambamba index {} -t  \$[SLURM_CPUS_PER_TASK/2]
-~/bin/split_ref_by_bai_datasize.py -s 1e6 -r $GENOME.fa.fai $(ls -1S $BAM_DIR/*.dedup.rg.csorted.bam | tail -n1) > $RUN_DIR/ArME14_target_1e6_reg
-ions_chr.tsv" > $JOBNAME.cmds
+echo "~/bin/split_ref_by_bai_datasize.py -s 1e6 -r $GENOME.fa.fai $(ls -1S $BAM_DIR/*.dedup.rg.csorted.bam | tail -n1) > $RUN_DIR/ArME14_target_1e6_regions_chr.tsv" > $JOBNAME.cmds
 # submit the job 
-sbatch -a --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=
-ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/serial_jobs_run.slurm
+sbatch --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/serial_jobs_run.slurm
 
 JOBNAME="Murdoch_FB_diploid"
-RUN_DIR=$WORK_DIR/SNP_calling_24_01_2025
+NCORES=6
+MEM=32
+WALLTIME="1:00:00"
+# RUN_DIR=$WORK_DIR/SNP_calling_24_01_2025
 PLOIDY=2
 MIN_DP=7
 # prepare commands
-BAM_FILES=$( find $BAM_DIR -maxdepth 1 -name "*.rg.csorted.bam" -size +1M  | xargs )
+BAM_FILES=$( find $BAM_DIR -maxdepth 1 -name "*.rg.csorted.bam" | xargs )
 cut -f1 $GENOME.fa.fai | parallel --dry-run "freebayes-parallel <(grep '{}' $RUN_DIR/ArME14_target_1e6_regions_chr.tsv | gawk '{printf \"%s:%s-%s\n\", \$1, \$2, \$3}') \$SLURM_CPUS_PER_TASK -f $GENOME.fa --genotype-qualities -g 100000 -C $MIN_DP -p $PLOIDY $BAM_FILES > $RUN_DIR/FB_array_output/{}.combined.vcf" > $RUN_DIR/$JOBNAME.cmds
 mkdir -p $RUN_DIR/FB_array_output
 # exit interactive job
-# send to the cluster
-sbatch -a 1-$(cat $RUN_DIR/$JOBNAME.cmds | wc -l)%10 --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=${RUN_DIR}/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME  ~/bin/array.slurm 
-
-# run in diploid mode
-JOBNAME="FB_diploid"
-RUN_DIR=$WORK_DIR/A_rabiei_TECAN_2022/$JOBNAME
-PLOIDY=2
-mkdir -p $RUN_DIR/FB_array_output
-cd $RUN_DIR
-
-# prepare commands
-BAM_FILES=$( find $BAM_DIR -maxdepth 1 -name "*.rg.csorted.bam" -size +1M  | xargs )
-cut -f1 $GENOME.fa.fai | parallel --dry-run "freebayes-parallel <(grep '{}' $WORK_DIR/A_rabiei_TECAN_2022/ArME14_target_1e6_regions_chr.tsv | gawk '{printf \"%s:%s-%s\n\", \$1, \$2, \$3}') \$SLURM_CPUS_PER_TASK  -f $GENOME.fa -g 50000 --genotype-qualities -C $MIN_DP -p $PLOIDY $BAM_FILES > $RUN_DIR/FB_array_output/{}.combined.vcf" > $RUN_DIR/$JOBNAME.cmds
-
-mkdir -p $RUN_DIR/FB_array_output
-# exit interactive job
-# send to the cluster
-sbatch -a 1-$(cat $RUN_DIR/$JOBNAME.cmds | wc -l)%10 --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/array.slurm 
+# submit to the cluster
+ARRAY_ID=$(sbatch -a 1-$(cat $RUN_DIR/$JOBNAME.cmds | wc -l) --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/array.slurm | cut -f 4)
 
 # merge variants
-ls -1 $RUN_DIR/FB_array_output/ArME14_ctg_*.combined.vcf | parallel --dry-run "printf \"{}\t%s\t%s\t%s\t%s\n\" \$(cat {} | grep -c -v '^#
-') \$(cat {} | SnpSift filter \"( GEN[?].DP > $MIN_DP ) & ( GEN[?].GT != './.' )\" | gawk '{if (\$0 ~ /^#/ || (length(\$4)==1 && length(\$5)==1)
-); print \$0}' | grep -c -v '^#') \$(cat {} | SnpSift filter \"( GEN[?].DP > $MIN_DP ) & ( GEN[?].GT != './.' ) & ( QUAL > 20 )\" | gawk '{if (\
-$0 ~ /^#/ || (length(\$4)==1 && length(\$5)==1)); print \$0}' | grep -c -v '^#') \$(cat {} | SnpSift filter \"( GEN[?].DP > $MIN_DP ) & ( GEN[?]
-.GT != './.' ) & ( QUAL > 30 )\" | gawk '{if (\$0 ~ /^#/ || (length(\$4)==1 && length(\$5)==1)); print \$0}' | grep -c -v '^#') > {}.stats" > ${
-RUN_DIR}/freebayes-stats.cmds
-JOBNAME=freebayes-merge
-echo "cat ${RUN_DIR}/freebayes-stats.cmds | parallel && cat $RUN_DIR/FB_array_output/ArME14_ctg_*.combined.vcf | vcffirstheader | vcfstre
-amsort -w 1000 | vcfuniq > A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid.vcf && 
-bgzip A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid.vcf && tabix A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid.vcf.gz" > $JOBNAME.
-cmds
+ls -1 $RUN_DIR/FB_array_output/ArME14_ctg_*.combined.vcf | parallel --dry-run "printf \"{}\t%s\t%s\t%s\t%s\n\" \$(cat {} | grep -c -v '^#') \$(cat {} | SnpSift filter \"( GEN[?].DP > $MIN_DP ) & ( GEN[?].GT != './.' )\" | gawk '{if (\$0 ~ /^#/ || (length(\$4)==1 && length(\$5)==1)); print \$0}' | grep -c -v '^#') \$(cat {} | SnpSift filter \"( GEN[?].DP > $MIN_DP ) & ( GEN[?].GT != './.' ) & ( QUAL > 20 )\" | gawk '{if (\$0 ~ /^#/ || (length(\$4)==1 && length(\$5)==1)); print \$0}' | grep -c -v '^#') \$(cat {} | SnpSift filter \"( GEN[?].DP > $MIN_DP ) & ( GEN[?].GT != './.' ) & ( QUAL > 30 )\" | gawk '{if (\$0 ~ /^#/ || (length(\$4)==1 && length(\$5)==1)); print \$0}' | grep -c -v '^#') > {}.stats" > ${RUN_DIR}/freebayes-stats.cmds
+JOBNAME="freebayes-merge"
+echo "cat ${RUN_DIR}/freebayes-stats.cmds | parallel && cat $RUN_DIR/FB_array_output/ArME14_ctg_*.combined.vcf | vcffirstheader | vcfstreamsort -w 1000 | vcfuniq > A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid.vcf && bgzip A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid.vcf && tabix A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid.vcf.gz" > $JOBNAME.cmds
 # submit job to cluster
-sbatch -a --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=
-ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/serial_jobs_run.slurm
+sbatch --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/serial_jobs_run.slurm
 # combaine stats
-cat <(printf "file\ttotal_snps\tDP${MIN_DP}_filtered_snps\tQUAL20_filtered_snps\tQUAL30_filtered_snps\n") <(cat $RUN_DIR/FB_array_output/
-ArME14_ctg_*.vcf.stats) > A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid_vcf_stats_$(date +%d_%m_%Y).txt
+cat <(printf "file\ttotal_snps\tDP${MIN_DP}_filtered_snps\tQUAL20_filtered_snps\tQUAL30_filtered_snps\n") <(cat $RUN_DIR/FB_array_output/ArME14_ctg_*.vcf.stats) > A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid_vcf_stats_$(date +%d_%m_%Y).txt
 
 
 ```
 
  
 #### Create and filter final variant file
-The variants that were called individually in each chromosome were merged into a single `vcf` file, which was gzipped, indexed. Variants were filtered using a combination of commands from SnpSift *v5.1d* [@rudenUsingDrosophilaMelanogaster2012], BCFtools *v1.17* [@danecekTwelveYearsSAMtools2021; @liStatisticalFrameworkSNP2011] and VCFtools *v0.1.16* [@danecekVariantCallFormat2011a], based on their total loci depth and quality, keeping only bi-allelic polymorphic SNP loci with an average loci depth of 10 and not more than 100,000 reads covering the locus (`10<DP<100000`, based on EDA). In addition, each isolate's genotype call was reset (recoded as missing, or `./.`) if it had read depth (`DP<7`) or called as a heterozygote. Variant statistics were generated by BCFtools pre and post filter.
+The variants that were called individually in each chromosome were merged into a single `vcf` file, which was gzipped, indexed. Variants were filtered using a combination of commands from SnpSift *v5.1d* [@rudenUsingDrosophilaMelanogaster2012], BCFtools *v1.17* [@danecekTwelveYearsSAMtools2021; @liStatisticalFrameworkSNP2011] and VCFtools *v0.1.16* [@danecekVariantCallFormat2011a], based on their total loci depth and quality, keeping only bi-allelic polymorphic SNP loci with an average loci depth of 100 and not more than 100,000 reads covering the locus (`100<DP<100000`, based on EDA). In addition, each isolate's genotype call was reset (recoded as missing, or `./.`) if it had read depth (`DP<10`) or called as a heterozygote. Variant statistics were generated by BCFtools pre and post filter.
 
 ```{bash vcf_filter}
 CONDA_NAME="genomics"
@@ -354,16 +332,24 @@ conda activate $CONDA_NAME
 # filter only polymorphic bi-allelic SNPs, using QUAL>20, 7<DP<100000
 
 # filter Freebayes variants with SnpSift and vcftools (wipe any heterozygote genotype with DP<7 with bcftools)
-QUAL=20
+QUAL=30 # 30
+MQ=30
 MAX_DP=100000
 MIN_DP=10
 IND_DP=7
-bcftools filter -S . -e 'GT=="het" | FMT/DP<7' A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid.vcf.gz -O v | SnpSift filter "( QUAL>
-=$QUAL ) & ( DP<$MAX_DP ) & ( DP>$MIN_DP ) & ( countRef()>=1 & countVariant()>=1 )" | vcftools --vcf -  --recode --recode-INFO-all --minQ $QUAL
---max-missing 0.75 --remove-indels --out A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid.Q$QUAL.GT75.noRep.noHet.poly
+JOBNAME="Murdoch-wgrs-fb-filter"
 
-bgzip A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid.Q$QUAL.GT75.noRep.noHet.poly.recode.vcf && tabix A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid.Q$QUAL.GT75.noRep.noHet.poly.recode.vcf.gz
-# generate stats NEED COMPLETING!
+echo "bcftools filter -S . -e \"GT=='het' | FMT/DP<$MIN_DP\" $RUN_DIR/A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid.vcf.gz -O v | SnpSift filter \"( QUAL>=$QUAL ) & ( countRef()>=1 & countVariant()>=1 )\" | bgzip -@ \$SLURM_CPUS_PER_TASK -c > $RUN_DIR/A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid.Q$QUAL.noHet.poly.recode.vcf.gz 
+vcftools --gzvcf $RUN_DIR/A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid.Q$QUAL.noHet.poly.recode.vcf.gz --recode --recode-INFO-all --minQ $QUAL --remove-indels -c | bgzip -@ \$SLURM_CPUS_PER_TASK -c > $RUN_DIR/A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid.snps.Q$QUAL.noHet.poly.recode.vcf.gz 
+vcftools --gzvcf $RUN_DIR/A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid.Q$QUAL.noHet.poly.recode.vcf.gz --recode --recode-INFO-all --minQ $QUAL --keep-only-indels -c | bgzip -@ \$SLURM_CPUS_PER_TASK -c > $RUN_DIR/A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid.indels.Q$QUAL.noHet.poly.recode.vcf.gz "> $RUN_DIR/$JOBNAME.cmds
+
+NCORES=6
+MEM=32
+WALLTIME="1:00:00"
+JOB_ID=$(sbatch --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/serial_jobs_run.slurm | cut -f 4 -d " ")
+
+#bcftools filter -S . -e "GT=='het' | FMT/DP<$MIN_DP" A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid.vcf.gz -O v | SnpSift filter "( QUAL>=$QUAL ) & ( DP<=$MAX_DP ) & ( DP>=$MIN_DP ) & ( countRef()>=1 & countVariant()>=1 )" | vcftools --vcf - --recode --recode-INFO-all --minQ $QUAL --max-missing 0.75 --remove-indels -c | bgzip -o A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid.Q$QUAL.GT75.noRep.noHet.poly.recode.vcf.gz && tabix A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid.Q$QUAL.GT75.noRep.noHet.poly.recode.vcf.gz
+# generate stats 
 JOBNAME="bcftools_stats"
 WALLTIME=2:00:00
 MEM=32
@@ -374,6 +360,396 @@ sbatch --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIM
 ```
 
 An in-house R script (`estimate_error_rates_vcf_files.R`) was used to estimate the error rates based on the presence of duplicated samples.
+
+#### Call SNPs with GATK
+The SNPs were also called from the WGRS using `gatk` following [this tutorial](https://www.melbournebioinformatics.org.au/tutorials/tutorials/variant_calling_gatk1/variant_calling_gatk1/) from Melbourne Bioinformatics.
+GATK can use a reference variant file as a guide for Base Quality Score Recalibration (BQSR, highly recommended) and will only call variants in those locations, so we need to generate that "Gold Standard" reference. It can be done by either of these options:  
+1. Use a set of variants called by CCDM from their assemblies (if it exists)  
+2. Use the variants generated by Freebayes (or Snippy) for the 2020 WGS batch sequenced at AGRF (which might introduce a bias towards those pre-selected sites)   
+3. Use GATK to call variants from the 2020 WGS batch sequenced at AGRF without BQSR, then use Variant Filtering (VQSR) to select a set of high-confidence variants and use them as the reference for subsequent recalibration and variant calling (in a bootstrap approach, as described in the [GATK BQSR documentation](https://gatk.broadinstitute.org/hc/en-us/articles/360035890531-Base-Quality-Score-Recalibration-BQSR))  
+We chose the 3rd option, as follows:
+
+```{bash gatk-wgs2020-initial}
+CONDA_NAME="genomics"
+# install tools
+mamba install -y -n $CONDA_NAME bwa-mem2 bowtie2 biobambam sambamba qualimap multiqc fastp gatk4
+WORK_DIR="/home/ibar/adna/A_rabiei"
+REF_DIR="/scratch/project/adna/A_rabiei/A_rabiei_TECAN_2022/ref_genome"
+GENOME="$REF_DIR/ArME14_v2_CCDM"
+
+# prepare working folder and reference genome
+DATE=`date +%d_%m_%Y`
+BATCH=AGRF
+RUN="${BATCH}_gatk_${DATE}" # day of run was 02_02_2019
+RUN_DIR=$WORK_DIR/${RUN}
+
+mkdir -p $RUN_DIR/aligned_reads $RUN_DIR/$JOBNAME && cd $RUN_DIR
+
+NCORES=2
+MEM=8
+WALLTIME="2:00:00"
+JOBNAME="gatk-prep-genome"
+# prepare genome
+echo "picard CreateSequenceDictionary R=$GENOME.fa  O=$GENOME.dict; gatk IndexFeatureFile -I $REF_VCF" > $RUN_DIR/$JOBNAME.cmds
+# send to the cluster
+sbatch --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/serial_jobs_run.slurm 
+
+# prepare commands to run mapping and initial gatk
+# define variables 
+NCORES=12
+MEM=64
+WALLTIME=2:00:00
+RGPM="NovaSeq"
+RGPL="ILLUMINA"
+RGPU="H3HGFDSX2"
+RGCN="AGRF"
+FQ_DIR="/scratch/project/adna/A_rabiei/AGRF_snippy_05_03_2025"
+JOBNAME="agrf-initial-gatk"
+
+# Create the bwa-mem2 commands to align all read pairs and create GVCF files
+find $FQ_DIR -name "*_R1.trimmed.fastq.gz" | parallel -k --dry-run --rpl "{file2} s:_R1:_R2:" --rpl "{sample} s:.+\/(.+?)_R1.+:\1:"  "ALIGN_DIR=$RUN_DIR/aligned_reads && bwa-mem2 mem -R \"@RG\tID:{sample}\tSM:{sample}\tLB:{sample}\tPU:$RGPU\tPL:$RGPL\tPM:$RGPM\tCN:$RGCN\" -t \$[SLURM_CPUS_PER_TASK - 2] $GENOME.fa {} {file2} | bamsormadup tmpfile=\$TMPDIR/bamsormadup_\$(hostname)_\$SLURM_ARRAY_JOB_ID inputformat=sam threads=\$[SLURM_CPUS_PER_TASK - 2] indexfilename=\$ALIGN_DIR/{sample}.dedup.rg.csorted.bam.bai > \$ALIGN_DIR/{sample}.dedup.rg.csorted.bam; gatk --java-options \"-Xmx7g\" HaplotypeCaller -I \$ALIGN_DIR/{sample}.dedup.rg.csorted.bam -R $GENOME.fa -ERC GVCF -O $RUN_DIR/$JOBNAME/{sample}.g.vcf.gz"  > $RUN_DIR/$JOBNAME.cmds
+
+# submit to the cluster
+ARRAY_ID=$(sbatch -a 1-$(cat $RUN_DIR/$JOBNAME.cmds | wc -l) --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/array.slurm | cut -f 4)
+
+# find which jobs failed
+FAILED_TASKS=$(sacct -n -X -j $ARRAY_ID -o state%20,jobid%20 | grep -v COMPLETED | gawk '{print $2}' | cut -d"_" -f2 | paste -s -d ',')
+MEM=64
+sbatch -a $FAILED_TASKS --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/array.slurm 
+
+
+# step 3  - Combine GCVF files and call variants
+GCVF_FILES=$(find $RUN_DIR/agrf-initial-gatk -maxdepth 1 -name "*.g.vcf.gz" | gawk '{printf " -V %s", $1}')
+JOBNAME="agrf-initial-gatk-combine-gvcf"
+mkdir -p $RUN_DIR/output
+echo "gatk --java-options \"-Xmx7g\" CombineGVCFs -R $GENOME.fa $GCVF_FILES -O $RUN_DIR/output/AGRF2020_cohort.g.vcf.gz
+gatk IndexFeatureFile -I $RUN_DIR/output/AGRF2020_cohort.g.vcf.gz
+gatk --java-options \"-Xmx7g\" GenotypeGVCFs -R $GENOME.fa -V $RUN_DIR/output/AGRF2020_cohort.g.vcf.gz -O $RUN_DIR/output/AGRF2020_cohort.gatk.vcf.gz"> $RUN_DIR/$JOBNAME.cmds
+# submit to the cluster
+sbatch --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/serial_jobs_run.slurm
+
+# step 4a  - Filter variants
+JOBNAME="agrf-initial-gatk-filter-snps"
+echo "gatk SelectVariants -V $RUN_DIR/output/AGRF2020_cohort.gatk.vcf.gz -select-type SNP -O $RUN_DIR/output/AGRF2020_cohort.gatk.snps.vcf.gz 
+gatk VariantFiltration -V $RUN_DIR/output/AGRF2020_cohort.gatk.snps.vcf.gz \
+    -filter \"QD < 2.0\" --filter-name \"QD2\" \
+    -filter \"QUAL < 30.0\" --filter-name \"QUAL30\" \
+    -filter \"SOR > 3.0\" --filter-name \"SOR3\" \
+    -filter \"FS > 60.0\" --filter-name \"FS60\" \
+    -filter \"MQ < 40.0\" --filter-name \"MQ40\" \
+    -filter \"MQRankSum < -12.5\" --filter-name \"MQRankSum-12.5\" \
+    -filter \"ReadPosRankSum < -8.0\" --filter-name \"ReadPosRankSum-8\" \
+    --genotype-filter-expression \"isHet == 1\" \
+    --genotype-filter-name \"isHetFilter\" \
+    --genotype-filter-expression \"DP < 10.0\" \
+    --genotype-filter-name \"DP10\" \
+    --genotype-filter-expression \"GQ < 30.0\" \
+    --genotype-filter-name \"DP30\" \
+    -O $RUN_DIR/output/AGRF2020_cohort.gatk.snps.filtered.vcf.gz
+gatk SelectVariants \
+  -V $RUN_DIR/output/AGRF2020_cohort.gatk.snps.filtered.vcf.gz \
+  --set-filtered-gt-to-nocall \
+  --max-fraction-filtered-genotypes 0.5 \
+  -O $RUN_DIR/output/AGRF2020_cohort.gatk.snps.gt_filtered.vcf.gz" > $RUN_DIR/$JOBNAME.cmds
+# submit to the cluster
+sbatch --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/serial_jobs_run.slurm
+
+# step 4b  - Filter variants
+JOBNAME="agrf-initial-gatk-filter-indels"
+echo "gatk SelectVariants -V $RUN_DIR/output/AGRF2020_cohort.gatk.vcf.gz -select-type INDEL -O $RUN_DIR/output/AGRF2020_cohort.gatk.indels.vcf.gz 
+gatk VariantFiltration \
+    -V $RUN_DIR/output/AGRF2020_cohort.gatk.indels.vcf.gz \
+    -filter \"QD < 2.0\" --filter-name \"QD2\" \
+    -filter \"QUAL < 30.0\" --filter-name \"QUAL30\" \
+    -filter \"FS > 200.0\" --filter-name \"FS200\" \
+    -filter \"ReadPosRankSum < -20.0\" --filter-name \"ReadPosRankSum-20\" \
+    --genotype-filter-expression \"isHet == 1\" \
+    --genotype-filter-name \"isHetFilter\" \
+    --genotype-filter-expression \"DP < 10.0\" \
+    --genotype-filter-name \"DP10\" \
+    --genotype-filter-expression \"GQ < 30.0\" \
+    --genotype-filter-name \"DP30\" \
+    -O $RUN_DIR/output/AGRF2020_cohort.gatk.indels.filtered.vcf.gz
+gatk SelectVariants \
+  -V $RUN_DIR/output/AGRF2020_cohort.gatk.indels.filtered.vcf.gz \
+  --set-filtered-gt-to-nocall \
+  --max-fraction-filtered-genotypes 0.5 \
+  -O $RUN_DIR/output/AGRF2020_cohort.gatk.indels.gt_filtered.vcf.gz" > $RUN_DIR/$JOBNAME.cmds
+# submit to the cluster
+sbatch --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/serial_jobs_run.slurm
+
+# Step 5 - Combine VCFs
+
+JOBNAME="agrf-initial-gatk-combine-vcfs"
+echo "picard MergeVcfs I=$RUN_DIR/output/AGRF2020_cohort.gatk.snps.gt_filtered.vcf.gz I=$RUN_DIR/output/AGRF2020_cohort.gatk.indels.gt_filtered.vcf.gz O=$RUN_DIR/output/AGRF2020_cohort.gatk.gt_filtered.combined.vcf.gz" > $RUN_DIR/$JOBNAME.cmds
+# submit to the cluster
+sbatch --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/serial_jobs_run.slurm
+```
+
+Now we can run the full GATK pipeline.
+```{bash gatk-wgs2020-full}
+WORK_DIR="/home/ibar/adna/A_rabiei"
+RUN_DIR="$WORK_DIR/AGRF_gatk_13_03_2025"
+CONDA_NAME="genomics"
+REF_DIR="/scratch/project/adna/A_rabiei/A_rabiei_TECAN_2022/ref_genome"
+GENOME="$REF_DIR/ArME14_v2_CCDM"
+REF_VCF="$RUN_DIR/output/AGRF2020_cohort.gatk.gt_filtered.combined.vcf.gz"
+BAM_DIR="$RUN_DIR/aligned_reads"
+JOBNAME="agrf-gatk-bqsr"
+
+mkdir -p $RUN_DIR/bqsr && cd $RUN_DIR
+
+# step 1  - Build BQSR model and apply BQSR
+find $BAM_DIR -maxdepth 1 -name "*.rg.csorted.bam" -size +1M | parallel --dry-run "gatk --java-options \"-Xmx7g\" BaseRecalibrator -I {} -R $GENOME.fa --known-sites $REF_VCF -O $RUN_DIR/bqsr/{/.}.recal_data.table; gatk --java-options \"-Xmx7g\" ApplyBQSR -I {} -R $GENOME.fa --bqsr-recal-file $RUN_DIR/bqsr/{/.}.recal_data.table -O bqsr/{/.}.bqsr.bam" > $RUN_DIR/$JOBNAME.cmds
+
+
+# submit to the cluster
+sbatch -a 1-$(cat $RUN_DIR/$JOBNAME.cmds | wc -l) --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/array.slurm
+
+
+NCORES=2
+MEM=16
+WALLTIME="2:00:00"
+JOBNAME="agrf-gatk-gvcf"
+mkdir -p $RUN_DIR/output2
+# step 2  - Create GCVF files per sample
+find $RUN_DIR/bqsr -maxdepth 1 -name "*.rg.csorted.bqsr.bam" -size +1M | parallel --dry-run --rpl "{sample} s:.+\/(.+?).dedup.rg.csorted.bqsr.bam:\1:" "gatk --java-options \"-Xmx7g\" HaplotypeCaller -I {} -R $GENOME.fa -ERC GVCF -O output/{sample}.g.vcf.gz"> $RUN_DIR/$JOBNAME.cmds
+
+
+# submit to the cluster
+ARRAY_ID=$(sbatch -a 1-$(cat $RUN_DIR/$JOBNAME.cmds | wc -l) --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/array.slurm | cut -f 4 -d " ")
+
+JOBNAME="gatk-combine-gvcf"
+# step 3  - Combine GCVF files and call variants
+GCVF_FILES=$(find $RUN_DIR/output -maxdepth 1 -name "AR*.g.vcf.gz" | gawk '{printf " -V %s", $1}')
+echo "gatk --java-options \"-Xmx7g\" CombineGVCFs -R $GENOME.fa $GCVF_FILES -O $RUN_DIR/output2/AGRF2020_cohort.g.vcf.gz
+gatk IndexFeatureFile -I $RUN_DIR/output2/AGRF2020_cohort.g.vcf.gz
+gatk --java-options \"-Xmx7g\" GenotypeGVCFs -R $GENOME.fa -V $RUN_DIR/output2/AGRF2020_cohort.g.vcf.gz -O $RUN_DIR/output2/AGRF2020_cohort.gatk.vcf.gz"> $RUN_DIR/$JOBNAME.cmds
+
+
+# submit to the cluster
+sbatch --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/serial_jobs_run.slurm
+
+# step 4a  - Filter variants (maybe ExcessHet > 10)
+JOBNAME="agrf-gatk-filter-snps"
+echo "gatk SelectVariants -V $RUN_DIR/output2/AGRF2020_cohort.gatk.vcf.gz -select-type SNP -O $RUN_DIR/output2/AGRF2020_cohort.gatk.snps.vcf.gz 
+gatk VariantFiltration -V $RUN_DIR/output2/AGRF2020_cohort.gatk.snps.vcf.gz \
+    -filter \"QD < 2.0\" --filter-name \"QD2\" \
+    -filter \"QUAL < 30.0\" --filter-name \"QUAL30\" \
+    -filter \"SOR > 3.0\" --filter-name \"SOR3\" \
+    -filter \"FS > 60.0\" --filter-name \"FS60\" \
+    -filter \"MQ < 40.0\" --filter-name \"MQ40\" \
+    -filter \"MQRankSum < -12.5\" --filter-name \"MQRankSum-12.5\" \
+    -filter \"ReadPosRankSum < -8.0\" --filter-name \"ReadPosRankSum-8\" \
+    --genotype-filter-expression \"isHet == 1\" \
+    --genotype-filter-name \"isHetFilter\" \
+    --genotype-filter-expression \"DP < 10.0\" \
+    --genotype-filter-name \"DP10\" \
+    --genotype-filter-expression \"GQ < 30.0\" \
+    --genotype-filter-name \"GQ30\" \
+    -O $RUN_DIR/output2/AGRF2020_cohort.gatk.snps.filtered.vcf.gz
+gatk SelectVariants \
+  -V $RUN_DIR/output2/AGRF2020_cohort.gatk.snps.filtered.vcf.gz \
+  --set-filtered-gt-to-nocall \
+  --max-fraction-filtered-genotypes 0.5 \
+  --exclude-filtered true \
+  -O $RUN_DIR/output2/AGRF2020_cohort.gatk.snps.gt_filtered.vcf.gz" > $RUN_DIR/$JOBNAME.cmds
+# submit to the cluster
+sbatch --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/serial_jobs_run.slurm
+
+# step 4b  - Filter variants
+JOBNAME="agrf-gatk-filter-indels"
+echo "gatk SelectVariants -V $RUN_DIR/output2/AGRF2020_cohort.gatk.vcf.gz -select-type INDEL -O $RUN_DIR/output2/AGRF2020_cohort.gatk.indels.vcf.gz 
+gatk VariantFiltration \
+    -V $RUN_DIR/output2/AGRF2020_cohort.gatk.indels.vcf.gz \
+    -filter \"QD < 2.0\" --filter-name \"QD2\" \
+    -filter \"QUAL < 30.0\" --filter-name \"QUAL30\" \
+    -filter \"FS > 200.0\" --filter-name \"FS200\" \
+    -filter \"ReadPosRankSum < -20.0\" --filter-name \"ReadPosRankSum-20\" \
+    --genotype-filter-expression \"isHet == 1\" \
+    --genotype-filter-name \"isHetFilter\" \
+    --genotype-filter-expression \"DP < 10.0\" \
+    --genotype-filter-name \"DP10\" \
+    --genotype-filter-expression \"GQ < 30.0\" \
+    --genotype-filter-name \"DP30\" \
+    -O $RUN_DIR/output2/AGRF2020_cohort.gatk.indels.filtered.vcf.gz
+gatk SelectVariants \
+  -V $RUN_DIR/output2/AGRF2020_cohort.gatk.indels.filtered.vcf.gz \
+  --set-filtered-gt-to-nocall \
+  --max-fraction-filtered-genotypes 0.5 \
+  -O $RUN_DIR/output2/AGRF2020_cohort.gatk.indels.gt_filtered.vcf.gz" > $RUN_DIR/$JOBNAME.cmds
+# submit to the cluster
+sbatch --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/serial_jobs_run.slurm
+
+# Step 5 - Combine VCFs
+
+JOBNAME="agrf-gatk-combine-vcfs"
+echo "picard MergeVcfs I=$RUN_DIR/output2/AGRF2020_cohort.gatk.snps.gt_filtered.vcf.gz I=$RUN_DIR/output2/AGRF2020_cohort.gatk.indels.gt_filtered.vcf.gz O=$RUN_DIR/output2/AGRF2020_cohort.gatk.gt_filtered.combined.vcf.gz" > $RUN_DIR/$JOBNAME.cmds
+# submit to the cluster
+sbatch --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/serial_jobs_run.slurm
+
+# clean output folders
+rm -rf $RUN_DIR/output $RUN_DIR/aligned_reads $RUN_DIR/bqsr
+```
+
+
+```{bash wgrs-murdoch-gatk}
+CONDA_NAME="genomics"
+# install tools
+mamba install -y -n $CONDA_NAME bwa-mem2 bowtie2 biobambam sambamba qualimap multiqc fastp gatk4
+
+# create working directory
+WORK_DIR="/scratch/project/adna/A_rabiei/Murdoch_WGRS"
+RUN_DIR="$WORK_DIR/GATK_Murdoch_WGRS_04_04_2025"
+mkdir -p $RUN_DIR/bqsr $RUN_DIR/gvcf $RUN_DIR/output && cd $RUN_DIR
+# Set variables
+GENOME="$REF_DIR/ArME14_v2_CCDM"
+AGRF_GATK_DIR="/scratch/project/adna/A_rabiei/AGRF_gatk_13_03_2025"
+REF_VCF="$AGRF_GATK_DIR/output/AGRF2020_cohort.gatk.gt_filtered.combined.vcf.gz"
+BAM_DIR="$AGRF_GATK_DIR/aligned_reads"
+JOBNAME="agrf-gatk-bqsr-gvcf"
+
+# prepare AGRF batch (original isolates)
+# select isolates
+ISOLATES="Ar0020|Ar0023|Ar0212|AR0242|AR0052|AR0210|AR0022|AR0128"
+find $BAM_DIR -maxdepth 1 -name "*.rg.csorted.bam" -size +1M | egrep -i $ISOLATES | parallel --dry-run --rpl "{sample} s:.+\/(.+?).dedup.rg.csorted.bam:\1:" "gatk --java-options \"-Xmx7g\" BaseRecalibrator -I {} -R $GENOME.fa --known-sites $REF_VCF -O $RUN_DIR/bqsr/{/.}.recal_data.table; gatk --java-options \"-Xmx7g\" ApplyBQSR -I {} -R $GENOME.fa --bqsr-recal-file $RUN_DIR/bqsr/{/.}.recal_data.table -O bqsr/{/.}.bqsr.bam; gatk --java-options \"-Xmx7g\" HaplotypeCaller -I $RUN_DIR/bqsr/{/.}.bqsr.bam -R $GENOME.fa -ERC GVCF -O $RUN_DIR/gvcf/{sample}.g.vcf.gz" > $RUN_DIR/$JOBNAME.cmds
+
+NCORES=2
+MEM=8
+WALLTIME="3:00:00"
+# submit to the cluster
+ARRAY_ID=$(sbatch -a 1-$(cat $RUN_DIR/$JOBNAME.cmds | wc -l) --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/array.slurm | cut -f 4 -d " ")
+
+
+# assign variables
+RGPM="DNBseq_T7"
+RGPL="ILLUMINA"
+RGPU="E250038400"
+RGCN="MU_SABC"
+FQ_DIR="$WORK_DIR/fungaldata"
+ln -s $WORK_DIR/fungal/*.fq.gz $FQ_DIR/
+BAM_DIR="$RUN_DIR/aligned_reads"
+mkdir -p $BAM_DIR $FQ_DIR/trimmed_reads/QC
+JOBNAME="Murdoch-fastp-bwa"
+
+
+find $FQ_DIR/*.R1.fq.gz | parallel -k --dry-run --rpl "{file2} s:.R1:.R2:; uq()" --rpl "{sample} s:.+\/(.+?).R1.fq.gz:\1:"  "fastp -i {} -I {file2} --detect_adapter_for_pe -c -l 30 -p -w \$SLURM_CPUS_PER_TASK -z 7 -o $FQ_DIR/trimmed_reads/{sample}_R1.trimmed.fastq.gz -O $FQ_DIR/trimmed_reads/{sample}_R2.trimmed.fastq.gz -j $FQ_DIR/trimmed_reads/QC/{sample}.fastp.json && bwa-mem2 mem -R \"@RG\tID:{sample}\tSM:{sample}\tLB:{sample}\tPU:$RGPU\tPL:$RGPL\tPM:$RGPM\tCN:$RGCN\" -t \$[SLURM_CPUS_PER_TASK - 2] $GENOME.fa $FQ_DIR/trimmed_reads/{sample}_R1.trimmed.fastq.gz $FQ_DIR/trimmed_reads/{sample}_R2.trimmed.fastq.gz | bamsormadup tmpfile=\$TMPDIR/bamsormadup_\$(hostname)_\$SLURM_ARRAY_JOB_ID inputformat=sam threads=\$[SLURM_CPUS_PER_TASK - 2] indexfilename=$BAM_DIR/{sample}.dedup.rg.csorted.bam.bai > $BAM_DIR/{sample}.dedup.rg.csorted.bam"  > $RUN_DIR/$JOBNAME.cmds
+
+NCORES=12
+MEM=96
+WALLTIME="5:00:00"
+
+# submit to the cluster
+ARRAY_ID=$(sbatch -a 1-$(cat $RUN_DIR/$JOBNAME.cmds | wc -l) --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/array.slurm | cut -f 4)
+
+JOBNAME="Murdoch-gatk-bqsr-gvcf"
+# step 1  - Build BQSR model and apply BQSR
+find $BAM_DIR -maxdepth 1 -name "*.rg.csorted.bam" -size +1M | parallel --dry-run --rpl "{sample} s:.+\/(.+?).dedup.rg.csorted.bam:\1:" "gatk --java-options \"-Xmx7g\" BaseRecalibrator -I {} -R $GENOME.fa --known-sites $REF_VCF -O $RUN_DIR/bqsr/{/.}.recal_data.table; gatk --java-options \"-Xmx7g\" ApplyBQSR -I {} -R $GENOME.fa --bqsr-recal-file $RUN_DIR/bqsr/{/.}.recal_data.table -O $RUN_DIR/bqsr/{/.}.bqsr.bam; gatk --java-options \"-Xmx7g\" HaplotypeCaller -I $RUN_DIR/bqsr/{/.}.bqsr.bam -R $GENOME.fa -ERC GVCF -O $RUN_DIR/gvcf/{sample}.g.vcf.gz" > $RUN_DIR/$JOBNAME.cmds
+
+NCORES=4
+MEM=12
+WALLTIME="3:00:00"
+
+# submit to the cluster
+ARRAY_ID=$(sbatch -a 1-$(cat $RUN_DIR/$JOBNAME.cmds | wc -l) --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/array.slurm | cut -f 4 -d " ")
+
+# step 3  - Combine GCVF files, call and filter variants
+QUAL=30
+MQ=30
+DP=10
+JOBNAME="Murdoch-gatk-combine-vcf"
+GCVF_FILES=$(find $RUN_DIR/gvcf -maxdepth 1 -name "*.g.vcf.gz" | gawk '{printf " -V %s", $1}')
+echo "gatk --java-options \"-Xmx7g\" CombineGVCFs -R $GENOME.fa $GCVF_FILES -O $RUN_DIR/gvcf/Murdoch_WGRS_cohort.g.vcf.gz
+gatk IndexFeatureFile -I $RUN_DIR/gvcf/Murdoch_WGRS_cohort.g.vcf.gz
+gatk --java-options \"-Xmx7g\" GenotypeGVCFs -R $GENOME.fa -V $RUN_DIR/gvcf/Murdoch_WGRS_cohort.g.vcf.gz -O $RUN_DIR/output/Murdoch_WGRS_cohort.gatk.vcf.gz"> $RUN_DIR/$JOBNAME.cmds
+# submit to the cluster
+JOB_ID=$(sbatch --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/serial_jobs_run.slurm | cut -f 4 -d " ")
+
+# step 4  - Filter variants
+JOBNAME="Murdoch-gatk-vcf-filter"
+echo "bcftools filter -S . -e \"GT=='het' | FMT/DP<$DP\" $RUN_DIR/output/Murdoch_WGRS_cohort.gatk.vcf.gz -O v | SnpSift filter \"( QUAL>=$QUAL ) & ( MQ>=$MQ ) & ( countRef()>=1 & countVariant()>=1 )\" | bgzip -@ \$SLURM_CPUS_PER_TASK -c > $RUN_DIR/output/Murdoch_WGRS_cohort.gatk.gt_filtered.vcf.gz -@ \$SLURM_CPUS_PER_TASK
+vcftools --gzvcf $RUN_DIR/output/Murdoch_WGRS_cohort.gatk.gt_filtered.vcf.gz --recode --recode-INFO-all --minQ $QUAL --remove-indels -c | bgzip -@ \$SLURM_CPUS_PER_TASK -c > $RUN_DIR/output/Murdoch_WGRS_cohort.gatk.snps.gt_filtered.vcf.gz 
+vcftools --gzvcf $RUN_DIR/output/Murdoch_WGRS_cohort.gatk.gt_filtered.vcf.gz --recode --recode-INFO-all --minQ $QUAL --keep-only-indels -c | bgzip -@ \$SLURM_CPUS_PER_TASK -c > $RUN_DIR/output/Murdoch_WGRS_cohort.gatk.indels.gt_filtered.vcf.gz -@ \$SLURM_CPUS_PER_TASK"> $RUN_DIR/$JOBNAME.cmds
+# submit to the cluster
+JOB_ID=$(sbatch --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/serial_jobs_run.slurm | cut -f 4 -d " ")
+
+# Step 5 - generate stats 
+JOBNAME="bcftools_stats"
+WALLTIME=2:00:00
+MEM=8
+NCORES=4
+find . -name "*.vcf.gz" | parallel --dry-run "bcftools stats -s - {} > {.}.bcfstats.txt" > $JOBNAME.cmds
+# send to the cluster
+JOB_ID=$(sbatch --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/parallel_jobs_run.slurm | cut -f 4 -d " ")
+
+
+
+echo "gatk SelectVariants -V $RUN_DIR/output/Murdoch_WGRS_cohort.gatk.vcf.gz -select-type SNP -O $RUN_DIR/output/Murdoch_WGRS_cohort.gatk.snps.vcf.gz 
+gatk VariantFiltration -V $RUN_DIR/output/Murdoch_WGRS_cohort.gatk.snps.vcf.gz \
+    -filter \"QD < 2.0\" --filter-name \"QD2\" \
+    -filter \"QUAL < 30.0\" --filter-name \"QUAL30\" \
+    -filter \"SOR > 3.0\" --filter-name \"SOR3\" \
+    -filter \"FS > 60.0\" --filter-name \"FS60\" \
+    -filter \"MQ < 40.0\" --filter-name \"MQ40\" \
+    -filter \"MQRankSum < -12.5\" --filter-name \"MQRankSum-12.5\" \
+    -filter \"ReadPosRankSum < -8.0\" --filter-name \"ReadPosRankSum-8\" \
+    --genotype-filter-expression \"isHet == 1\" \
+    --genotype-filter-name \"isHetFilter\" \
+    --genotype-filter-expression \"DP < 10.0\" \
+    --genotype-filter-name \"DP10\" \
+    --genotype-filter-expression \"GQ < 30.0\" \
+    --genotype-filter-name \"DP30\" \
+    -O $RUN_DIR/output/Murdoch_WGRS_cohort.gatk.snps.filtered.vcf.gz
+gatk SelectVariants \
+  -V $RUN_DIR/output/Murdoch_WGRS_cohort.gatk.snps.filtered.vcf.gz \
+  --set-filtered-gt-to-nocall \
+  --max-fraction-filtered-genotypes 0.5 \
+  --max-fraction-filtered-genotypes 0.25 \
+  -O $RUN_DIR/output/Murdoch_WGRS_cohort.gatk.snps.gt_filtered.vcf.gz" > $RUN_DIR/$JOBNAME.cmds
+
+
+
+
+
+# submit to the cluster
+sbatch --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/serial_jobs_run.slurm
+
+# step 4b  - Filter variants
+JOBNAME="agrf-gatk-filter-indels"
+echo "gatk SelectVariants -V $RUN_DIR/output/Murdoch_WGRS_cohort.gatk.vcf.gz -select-type INDEL -O $RUN_DIR/output/Murdoch_WGRS_cohort.gatk.indels.vcf.gz 
+gatk VariantFiltration \
+    -V $RUN_DIR/output/Murdoch_WGRS_cohort.gatk.indels.vcf.gz \
+    -filter \"QD < 2.0\" --filter-name \"QD2\" \
+    -filter \"QUAL < 30.0\" --filter-name \"QUAL30\" \
+    -filter \"FS > 200.0\" --filter-name \"FS200\" \
+    -filter \"ReadPosRankSum < -20.0\" --filter-name \"ReadPosRankSum-20\" \
+    --genotype-filter-expression \"isHet == 1\" \
+    --genotype-filter-name \"isHetFilter\" \
+    --genotype-filter-expression \"DP < 10.0\" \
+    --genotype-filter-name \"DP10\" \
+    --genotype-filter-expression \"GQ < 30.0\" \
+    --genotype-filter-name \"DP30\" \
+    -O $RUN_DIR/output/Murdoch_WGRS_cohort.gatk.indels.filtered.vcf.gz
+gatk SelectVariants \
+  -V $RUN_DIR/output/Murdoch_WGRS_cohort.gatk.indels.filtered.vcf.gz \
+  --set-filtered-gt-to-nocall \
+  --max-fraction-filtered-genotypes 0.5 \
+  -O $RUN_DIR/output/Murdoch_WGRS_cohort.gatk.indels.gt_filtered.vcf.gz" > $RUN_DIR/$JOBNAME.cmds
+# submit to the cluster
+sbatch --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/serial_jobs_run.slurm
+
+# Step 5 - Combine VCFs
+
+JOBNAME="agrf-gatk-combine-vcfs"
+echo "picard MergeVcfs I=$RUN_DIR/output/Murdoch_WGRS_cohort.gatk.snps.gt_filtered.vcf.gz I=$RUN_DIR/output/Murdoch_WGRS_cohort.gatk.indels.gt_filtered.vcf.gz O=$RUN_DIR/output/Murdoch_WGRS_cohort.gatk.gt_filtered.combined.vcf.gz" > $RUN_DIR/$JOBNAME.cmds
+# submit to the cluster
+sbatch --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/serial_jobs_run.slurm
+
+# clean output folders
+rm -r $RUN_DIR/output/Ar*.g.vcf.gz* $RUN_DIR/bqsr $RUN_DIR/aligned_reads
+
+```
+
 
 #### MutilQC
 
@@ -400,19 +776,24 @@ rclone copy -P --ignore-checksum --ignore-size --include "**/*.html" $RUN_DIR GR
 
 ### Comparison of Alignment and SNP calling pipelines
 
-In order to select the optimal SNP calling pipeline that will strike a good balance between sensitive SNP discovery and the lowest error rates (as measured by heterozygote calls and inconsistencies between technical replicates [AR0039, AR0052, AR0242] ).
-We will test different alignment tools and parameters (`BWA-MEM2`, `Bowtie2`) with different variant callers (`GATK`, `FreeBayes`, `Clair3`) and a complete `Nextflow` pipeline implementing those (`Sarek`).
+We will test different alignment tools and parameters (`BWA-MEM2`, `Bowtie2`) with different variant callers (`GATK`, `FreeBayes`, `Clair3`) and a complete `Nextflow` pipeline implementing those (`Sarek`) to assess and identify the optimal SNP calling pipeline that will strike a good balance between sensitive SNP discovery and the lowest error rates (as measured by heterozygote calls and inconsistencies between technical replicates [AR0039, AR0052, AR0242] and low-coverage sampled [Ar23640, Ar23497, Ar23483]). To compare the VCF files we will use [RTG tools](https://github.com/RealTimeGenomics/rtg-tools).[@clearyComparingVariantCall2015].
+An example for this approach was described for another haploid fungi, _Candida auris_, as described by @liComparingGenomicVariant2023.
+
+#### Compare alignment tools
 
 We will test the following alignment options:  
 1. `BWA-MEM2` with `-B` ranging from `4:6` and `-O 6/7/8` (which includes default `-B 4 -O 6`).  
 2. `Bowtie2` in `local` alignment mode: `--local-fast`, `--local-sensitive` (default), `--local--very-sensitive`.  
 3. Same as above, but in `global` alignment mode: `--global-sensitive`, etc.  
+Doing each step in parallel takes up too much space on the cluster. A better approach would be to align the reads and call variants with the different callers for each combination and then remove the `bam` files. 
 
+```{bash calling-comparison}
+WORK_DIR="/scratch/ibar/A_rabiei"
+WORK_DIR="/scratch/project/adna/A_rabiei"
 
-
-```{bash alignment-comparison}
+# GENOME="$WORK_DIR/A_rabiei_TECAN_2022/ref_genome/ArME14_v2_CCDM"
+CONDA_NAME="genomics"
 # install tools
-CONDA_NAME=genomics
 mamba install -y -n $CONDA_NAME bwa-mem2 bowtie2 biobambam sambamba qualimap multiqc fastp
 # assign variables
 REF_DIR="/scratch/project/adna/A_rabiei/A_rabiei_TECAN_2022/ref_genome"
@@ -422,70 +803,87 @@ GENOME="$REF_DIR/ArME14_v2_CCDM"
 # or run with a container (need to login to a compute node)
 start_debug_interactive_job
 apptainer exec $NXF_APPTAINER_CACHEDIR/depot.galaxyproject.org-singularity-bowtie2-2.4.4--py39hbb4e92a_0.img bowtie2-build $GENOME.fa $GENOME
-WORK_DIR="/scratch/project/adna/A_rabiei"
-FQ_DIR="$WORK_DIR/A_rabiei_WGS_2021"
+
+MURDOCH_DIR="/scratch/project/adna/A_rabiei/Murdoch_WGRS/fungal"
+AGRF_DIR="/scratch/project/adna/A_rabiei/AGRF_CAGRF20114478"
 # create a working folder
-RUN_DIR=$WORK_DIR/SNP_calling_comparison
-mkdir -p $RUN_DIR/aligned_reads && mkdir -p $RUN_DIR/trimmed_reads/QC && cd $RUN_DIR
+RUN_DIR="$WORK_DIR/SNP_calling_comparison"
+FQ_DIR="$RUN_DIR/data"
+mkdir -p $RUN_DIR/aligned_reads $RUN_DIR/trimmed_reads/QC $FQ_DIR && cd $RUN_DIR
+
+# select isolates
+ISOLATES="Ar23401_|Ar0020|Ar0023|Ar0212|AR0242|AR0052|AR0210|AR0022|AR0128|Ar23640|Ar23653_|Ar23497|Ar23483"
+
+# Create symlinks to Murdoch reads
+ls -1 $MURDOCH_DIR/*.fq.gz | egrep -i $ISOLATES | parallel ln -s {} $FQ_DIR/
+# Create symlinks to AGRF reads
+ls -1 $AGRF_DIR/*.fastq.gz | egrep -i $ISOLATES | parallel ln -s {} $FQ_DIR/
+
+# standardise names
+# AR0070_H3HGFDSX2_CTGACTCTAC-TGACGGCCGT_L002_R1.fastq.gz
+cd $FQ_DIR
+rename -v 's|.+\/(.+?)_H3HGFDSX2_[A-Z\-]+_L002_(R[0-9]).fastq.gz|\1.\2.fq.gz|' *.fastq.gz
+
+cd $RUN_DIR
+
+NCORES=12
+MEM=64
+WALLTIME="2:00:00"
+JOBNAME="process_reads"
+# create commands
+find $FQ_DIR/*.R1.fq.gz | parallel -k --dry-run --rpl "{file2} s:.R1:.R2:; uq()" --rpl "{sample} s:.+\/(.+?).R1.fq.gz:\1:"  "fastp -i {} -I {file2} --detect_adapter_for_pe -c -l 30 -p -w \$SLURM_CPUS_PER_TASK -z 7 -o $RUN_DIR/trimmed_reads/{sample}_R1.trimmed.fastq.gz -O $RUN_DIR/trimmed_reads/{sample}_R2.trimmed.fastq.gz -j $RUN_DIR/trimmed_reads/QC/{sample}.fastp.json" > $JOBNAME.cmds
+
+# submit to the cluster
+sbatch -a 1-$(cat $RUN_DIR/$JOBNAME.cmds | wc -l) --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/array.slurm
+
 
 
 NCORES=12
 MEM=64
-WALLTIME="5:00:00"
-JOBNAME=process_reads
-CONDA_NAME=genomics
-# Create the commands to repair all read pairs.
-find $FQ_DIR/*_R1.fastq.gz | egrep "AR0039|AR0052|AR0242" | parallel -k --dry-run --rpl "{infile} s:_R1:_R#:; uq()" --rpl "{sample} s:.+\/(.+?)_H3HGFDSX2_[ACGT\-]+_L00[0-4]_.+:\1:"  "repair.sh in={infile} out=$RUN_DIR/fixed_reads/{sample}_R#.fixed.fastq.gz repair ow zl=7 threads=\$[SLURM_CPUS_PER_TASK - 2]; fastp -i $RUN_DIR/fixed_reads/{sample}_R1.fixed.fastq.gz -I $RUN_DIR/fixed_reads/{sample}_R2.fixed.fastq.gz --detect_adapter_for_pe -c -l 30 -p -w \$SLURM_CPUS_PER_TASK -z 7 -o $RUN_DIR/fixed_reads/{sample}_R1.fixed.trimmed.fastq.gz -O $RUN_DIR/fixed_reads/{sample}_R2.fixed.trimmed.fastq.gz -j $RUN_DIR/fixed_reads/QC/{sample}.fastp.json -h $RUN_DIR/fixed_reads/QC/{sample}.fastp.html" > $JOBNAME.cmds
-
-# submit it as a Slurm job
-echo '#!/bin/bash --login
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --output=%x.%j.log'"
-#SBATCH --job-name=$JOBNAME
-#SBATCH --cpus-per-task=$NCORES
-#SBATCH --mem=${MEM}G
-#SBATCH --time=$WALLTIME
-#SBATCH --account=a_agri_genomics
-#SBATCH --partition=general
-
-set -Eeo pipefail
-source ~/.bashrc
-conda activate $CONDA_NAME
-cd \$SLURM_SUBMIT_DIR
-srun bash $JOBNAME.cmds" > $JOBNAME.slurm
-# submit the job 
-sbatch $JOBNAME.slurm
-
-NCORES=12
-MEM=64
-WALLTIME="5:00:00"
-JOBNAME=bwa-mem-align
-# Create the bwa-mem2 commands commands to repair all read pairs.
-parallel -k --dry-run --rpl "{file2} s:_R1:_R2:" --rpl "{sample} s:.+\/(.+?)_R1.+:\1:"  "ALIGN_DIR=$WORK_DIR/SNP_calling_comparison/aligned_reads/bwamem_B{2}_O{3}; mkdir -p \$ALIGN_DIR && bwa-mem2 mem -B {2} -O {3} -R \"@RG\tID:{1 sample}\tSM:{1 sample}\tLB:{1 sample}\tPU:H3HGFDSX2\tPL:ILLUMINA\tCN:AGRF\" -t \$[SLURM_CPUS_PER_TASK - 2] $GENOME.fa {1} {1 file2} | bamsormadup tmpfile=/scratch/project/adna/tmp/bamsormadup_\$(hostname) inputformat=sam threads=\$[SLURM_CPUS_PER_TASK - 2] > \$ALIGN_DIR/{1 sample}.dedup.rg.csorted.bam; unset DISPLAY; qualimap bamqc -bam \$ALIGN_DIR/{1 sample}.dedup.rg.csorted.bam --java-mem-size=4G -c -gff $GENOME.bed -outdir \$ALIGN_DIR/{1 sample}_bamqc" ::: $(find $RUN_DIR -name "*_R1.fixed.trimmed.fastq.gz") ::: 4 5 6 7 8 ::: 6 7 8 > $RUN_DIR/$JOBNAME.cmds
+WALLTIME="1:00:00"
+JOBNAME="bwa-mem-align-AGRF"
+# Create the bwa-mem2 commands to align the reads to the genome.
+parallel -k --dry-run --rpl "{file2} s:_R1:_R2:" --rpl "{sample} s:.+\/(.+?)_R1.+.gz:\1:"  "ALIGN_DIR=$RUN_DIR/aligned_reads/bwamem_B{2}_O{3}; mkdir -p \$ALIGN_DIR && bwa-mem2 mem -B {2} -O {3} -R \"@RG\tID:{1 sample}\tSM:{1 sample}\tLB:{1 sample}\tPU:H3HGFDSX2\tPL:ILLUMINA\tCN:AGRF\" -t \$[SLURM_CPUS_PER_TASK - 2] $GENOME.fa {1} {1 file2} | bamsormadup tmpfile=\${TMPDIR:-/scratch/project/adna/tmp/}/\${SLURM_JOB_NAME} inputformat=sam threads=\$[SLURM_CPUS_PER_TASK - 2] > \$ALIGN_DIR/{1 sample}.dedup.rg.csorted.bam; unset DISPLAY; qualimap bamqc -bam \$ALIGN_DIR/{1 sample}.dedup.rg.csorted.bam --java-mem-size=32G -c -gff $GENOME.bed -outdir \$ALIGN_DIR/{1 sample}_bamqc" ::: $(find $RUN_DIR/trimmed_reads -name "AR*_R1.trimmed.fastq.gz") ::: 4 5 6 7 8 ::: 6 7 8 > $RUN_DIR/$JOBNAME.cmds
 # submit it as a Slurm job array
-sbatch -a 1-$(cat $RUN_DIR/$JOBNAME.cmds | wc -l)%10 --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME  ~/bin/array.slurm
+sbatch -a 1-$(cat $RUN_DIR/$JOBNAME.cmds | wc -l) --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME  ~/bin/array.slurm
+
+JOBNAME="bwa-mem-align-Murdoch"
+# Create the bwa-mem2 commands to align the reads to the genome.
+parallel -k --dry-run --rpl "{file2} s:_R1:_R2:" --rpl "{sample} s:.+\/(.+?)_R1.+.gz:\1:"  "ALIGN_DIR=$RUN_DIR/aligned_reads/bwamem_B{2}_O{3}; mkdir -p \$ALIGN_DIR && bwa-mem2 mem -B {2} -O {3} -R \"@RG\tID:{1 sample}\tSM:{1 sample}\tLB:{1 sample}\tPU:E250038400\tPL:MGI-DNBSEQ-T7\tCN:Murdoch\" -t \$[SLURM_CPUS_PER_TASK - 2] $GENOME.fa {1} {1 file2} | bamsormadup tmpfile=\${TMPDIR:-/scratch/project/adna/tmp/}/\${SLURM_JOB_NAME} inputformat=sam threads=\$[SLURM_CPUS_PER_TASK - 2] > \$ALIGN_DIR/{1 sample}.dedup.rg.csorted.bam; unset DISPLAY; qualimap bamqc -bam \$ALIGN_DIR/{1 sample}.dedup.rg.csorted.bam --java-mem-size=32G -c -gff $GENOME.bed -outdir \$ALIGN_DIR/{1 sample}_bamqc" ::: $(find $RUN_DIR/trimmed_reads -name "Ar*_R1.trimmed.fastq.gz") ::: 4 5 6 7 8 ::: 6 7 8 > $RUN_DIR/$JOBNAME.cmds
+# submit it as a Slurm job array
+sbatch -a 1-$(cat $RUN_DIR/$JOBNAME.cmds | wc -l) --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME  ~/bin/array.slurm
 
 NCORES=12
 MEM=64
 WALLTIME="5:00:00"
-JOBNAME=bowtie2-align
+JOBNAME="bowtie2-align-Murdoch"
 # Create the bowtie2 commands commands to repair all read pairs.
-parallel -k --dry-run --rpl "{file2} s:_R1:_R2:" --rpl "{sample} s:.+/(.+?)_R1.+:\1:"  "ALIGN_DIR=$WORK_DIR/SNP_calling_comparison/aligned_reads/bt2_{2}{3}; mkdir -p \$ALIGN_DIR  && bowtie2 --{2}{3} --rg-id {1 sample} --rg 'SM:{1 sample}' --rg 'LB:{1 sample}' --rg 'PU:H3HGFDSX2' --rg 'PL:ILLUMINA' --rg 'CN:AGRF' -p \$[SLURM_CPUS_PER_TASK - 2] -x $GENOME -1 {1} -2 {1 file2} | bamsormadup tmpfile=/scratch/project/adna/tmp/bamsormadup_\$(hostname) inputformat=sam threads=\$[SLURM_CPUS_PER_TASK - 2] > \$ALIGN_DIR/{1 sample}.dedup.rg.csorted.bam; unset DISPLAY; qualimap bamqc -bam \$ALIGN_DIR/{1 sample}.dedup.rg.csorted.bam --java-mem-size=4G -c -gff $GENOME.bed -outdir \$ALIGN_DIR/{1 sample}_bamqc" ::: $(find $RUN_DIR -name "*_R1.fixed.trimmed.fastq.gz") ::: "fast" "sensitive" "very-sensitive" ::: "-local" ""  > $RUN_DIR/$JOBNAME.cmds
+parallel -k --dry-run --rpl "{file2} s:_R1:_R2:" --rpl "{sample} s:.+/(.+?)_R1.+:\1:"  "ALIGN_DIR=$RUN_DIR/aligned_reads/bt2_{2}{3}; mkdir -p \$ALIGN_DIR  && bowtie2 --{2}{3} --rg-id {1 sample} --rg 'SM:{1 sample}' --rg 'LB:{1 sample}' --rg 'PU:E250038400' --rg 'PL:MGI-DNBSEQ-T7' --rg 'CN:Murdoch' -p \$[SLURM_CPUS_PER_TASK - 2] -x $GENOME -1 {1} -2 {1 file2} | bamsormadup tmpfile=\${TMPDIR:-/scratch/project/adna/tmp/}/\${SLURM_JOB_NAME} inputformat=sam threads=\$[SLURM_CPUS_PER_TASK - 2] > \$ALIGN_DIR/{1 sample}.dedup.rg.csorted.bam; unset DISPLAY; qualimap bamqc -bam \$ALIGN_DIR/{1 sample}.dedup.rg.csorted.bam --java-mem-size=32G -c -gff $GENOME.bed -outdir \$ALIGN_DIR/{1 sample}_bamqc" ::: $(find $RUN_DIR/trimmed_reads -name "Ar*_R1.trimmed.fastq.gz") ::: "fast" "sensitive" "very-sensitive" ::: "-local" ""  > $RUN_DIR/$JOBNAME.cmds
 
 # submit it as a Slurm job array
-sbatch -a 1-$(cat $RUN_DIR/$JOBNAME.cmds | wc -l)%10 --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME  ~/bin/array.slurm
+sbatch -a 1-$(cat $RUN_DIR/$JOBNAME.cmds | wc -l) --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME  ~/bin/array.slurm
 
 
+JOBNAME="bowtie2-align-AGRF"
+# Create the bowtie2 commands commands to repair all read pairs.
+parallel -k --dry-run --rpl "{file2} s:_R1:_R2:" --rpl "{sample} s:.+/(.+?)_R1.+:\1:"  "ALIGN_DIR=$RUN_DIR/aligned_reads/bt2_{2}{3}; mkdir -p \$ALIGN_DIR  && bowtie2 --{2}{3} --rg-id {1 sample} --rg 'SM:{1 sample}' --rg 'LB:{1 sample}' --rg 'PU:H3HGFDSX2' --rg 'PL:ILLUMINA' --rg 'CN:AGRF' -p \$[SLURM_CPUS_PER_TASK - 2] -x $GENOME -1 {1} -2 {1 file2} | bamsormadup tmpfile=\${TMPDIR:-/scratch/project/adna/tmp/}/\${SLURM_JOB_NAME} inputformat=sam threads=\$[SLURM_CPUS_PER_TASK - 2] > \$ALIGN_DIR/{1 sample}.dedup.rg.csorted.bam; unset DISPLAY; qualimap bamqc -bam \$ALIGN_DIR/{1 sample}.dedup.rg.csorted.bam --java-mem-size=32G -c -gff $GENOME.bed -outdir \$ALIGN_DIR/{1 sample}_bamqc" ::: $(find $RUN_DIR/trimmed_reads -name "AR*_R1.trimmed.fastq.gz") ::: "fast" "sensitive" "very-sensitive" ::: "-local" ""  > $RUN_DIR/$JOBNAME.cmds
 
-
+# submit it as a Slurm job array
+sbatch -a 1-$(cat $RUN_DIR/$JOBNAME.cmds | wc -l) --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME  ~/bin/array.slurm
 
 #  Multi-bamqc: create/copy a file describing the sample names (sample_info.txt) to the parent folder and use it in qualimap 
 
 find `pwd` -name "*_bamqc" | gawk '{sample_name=gensub(/.+\/(.+)_bamqc/, "\\1", $1); printf "%s\t%s\n", sample_name, $1}' > multibamqc.samples
  
 
-QUALIMAP_MULTI=$( echo "cd $RUN_DIR ; source ~/.bashrc; conda activate $CONDA_NAME; unset DISPLAY ; find `pwd` -name \"*_bamqc\" | gawk '{sample_name=gensub(/.+\/(.+)_bamqc/, \"\\\1\", \$1); printf \"%s\t%s\n\", sample_name, \$1}' > multibamqc.samples ; qualimap multi-bamqc --java-mem-size=4G -d multibamqc.samples -outformat PDF:HTML -outdir ${BATCH}_bamqc " | qsub -V -l select=1:ncpus=${NCORES}:mem=32GB,walltime=5:00:00 -N ${QUALIMAP_JOB:0:11} | egrep -o "^[0-9]+")
+QUALIMAP_MULTI=$( echo "cd $RUN_DIR ; source ~/.bashrc; conda activate $CONDA_NAME; unset DISPLAY ; find `pwd` -name \"*_bamqc\" | gawk '{sample_name=gensub(/.+\/(.+)_bamqc/, \"\\\1\", \$1); printf \"%s\t%s\n\", sample_name, \$1}' > multibamqc.samples ; qualimap multi-bamqc --java-mem-size=16G -d multibamqc.samples -outformat PDF:HTML -outdir ${BATCH}_bamqc " | qsub -V -l select=1:ncpus=${NCORES}:mem=32GB,walltime=5:00:00 -N ${QUALIMAP_JOB:0:11} | egrep -o "^[0-9]+")
+```
+
+#### Compare variant calling tools
+Next, we call variants with different variant callers (`GATK`, `FreeBayes`, `Clair3`) and a complete `Nextflow` pipeline implementing those (`Sarek`).
+
+```{bash compare-variant-calling}
+
 ```
 
 
