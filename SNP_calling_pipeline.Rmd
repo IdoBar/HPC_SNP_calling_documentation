@@ -47,14 +47,14 @@ knitr::opts_chunk$set(list(echo = TRUE, eval=FALSE, message=FALSE))
 
 ## Experimental Design
 
-DNA was extracted from XXX isolates of *Ascochyta rabiei* (collected in 2024-25) and prepared for low-pass whole-genome resequencing (WGRS) at the State Agricultural Biotechnology Centre ([SABC](https://www.murdoch.edu.au/research/sabc)) at Murdoch University (led by Prof. Rajeev Varshney). DNA libraries were prepared and sequenced on an MGI DNBSEQ-T7, producing 150 bp paired-end reads (run name E250038400).
+DNA was extracted from 344 isolates of *Ascochyta rabiei* (collected in 2024-25) and prepared for whole-genome resequencing (WGRS) at the State Agricultural Biotechnology Centre ([SABC](https://www.murdoch.edu.au/research/sabc)) at Murdoch University (led by Prof. Rajeev Varshney). DNA libraries were prepared and sequenced on an MGI DNBSEQ-T7, producing 150 bp paired-end reads.
 
 ## Aims
 
-**UPDATE**    
-
-- Identify strain-unique variants to develop detection methods  
-- Associate aggressiveness with specific variants  
+- Compare variant detection pipelines that allow accurate identification of Multi-Locus-Haplotypes (MLH)  
+- Identify MLHs descending from an original population and measure their frequencies   
+- Asses the impact of host genotype on MLHs frequencies  
+- Identify genomic loci and regions that drive isolate adaptation/evolution under different selection pressures
 
 
 ## Methods
@@ -68,7 +68,7 @@ DNA was extracted from XXX isolates of *Ascochyta rabiei* (collected in 2024-25)
 2.  Mapping reads to a reference genome  
 3.  Reads deduplication and read group addition  
 4.  Variant calling and filtration  
-5.  Population genetics analysis (clustering)  
+5.  Population genetics analysis (MLH clustering)  
 
 Sequencing data processing, mapping and variant calling were performed on the *QCIF Bunya* (using Slurm scheduler, see [documentation](https://github.com/UQ-RCC/hpc-docs/tree/main)) and in [GalaxyAU](https://usegalaxy.org.au). 
 
