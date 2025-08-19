@@ -30,6 +30,7 @@ csl: style/springer-basic-improved-author-date-with-italic-et-al-period.csl
 ```{r setup, include=FALSE}
 devtools::source_gist("7f63547158ecdbacf31b54a58af0d1cc", filename = "util.R")
 knitr::opts_chunk$set(list(echo = TRUE, eval=FALSE, message=FALSE))
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
 # options(width = 180)
 # Sys.setenv(JAVA_HOME = "C:/Program Files/Java/jre1.8.0_341")
 
@@ -78,28 +79,7 @@ Sequencing data processing, mapping and variant calling were performed on the *Q
 Install needed software in a `conda` environment on the HPC cluster (we will install a [Miniforge distribution](https://github.com/conda-forge/miniforge), which has `mamba` already installed - see [mamba docs](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html)).
 
 ```{bash setup-conda}
-# download miniforge conda
-wget "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
-bash Miniforge3-$(uname)-$(uname -m).sh
-# accept defaults and let conda initialise
-# initialise conda
-source ~/.bashrc
-# add channels and set priorities
-conda config --add channels conda-forge
-conda config --append channels bioconda
-
-# install extra packages to the base environment
-mamba install -n base libgcc gnutls libuuid readline cmake git tmux libgfortran parallel mamba gawk pigz rename genozip autoconf sshpass gh
-# install snippy (need to fix internet connection to gowonda2 - use patched netcheck in ~/bin)
-# source ~/.proxy
-CONDA_NAME=genomics
-mamba create -n $CONDA_NAME snippy sra-tools bcbio-gff libgd xorg-libxpm \
-                libpng libjpeg-turbo jpeg snpsift rename biobambam bwa-mem2 sambamba \
-                libtiff genozip parallel qualimap multiqc bbmap fastp freebayes bedops 
-# Clean extra space
-# conda update -n base conda
-conda clean -y --all
-
+mkdir -p ~/bin
 # Prepare a general array Slurm script
 echo '#!/bin/bash --login
 #SBATCH --nodes=1
@@ -130,6 +110,36 @@ bash \$CMDS_FILE" > ~/bin/serial_jobs_run.slurm
 # Prepare a parallel jobs Slurm script
 echo '
 cat $CMDS_FILE | parallel' | cat <(head -n -1  ~/bin/serial_jobs_run.slurm) - > ~/bin/parallel_jobs_run.slurm
+
+
+# download and install miniforge conda and compute environment
+JOBNAME="install-conda"
+NCORES=8
+MEM=32
+WALLTIME="5:00:00"
+CONDA_NAME="genomics"
+echo "wget \"https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh\"
+bash Miniforge3-$(uname)-$(uname -m).sh
+# accept defaults and let conda initialise
+# initialise conda
+source ~/.bashrc
+# add channels and set priorities
+conda config --add channels conda-forge
+conda config --append channels bioconda
+
+# install extra packages to the base environment
+mamba install -n base libgcc gnutls libuuid readline cmake git tmux libgfortran parallel mamba gawk pigz rename genozip autoconf sshpass gh
+# install snippy (need to fix internet connection to gowonda2 - use patched netcheck in ~/bin)
+# source ~/.proxy
+CONDA_NAME=genomics
+mamba create -n $CONDA_NAME snippy sra-tools bcbio-gff libgd xorg-libxpm \
+                libpng libjpeg-turbo jpeg snpsift rename biobambam bwa-mem2 sambamba \
+                libtiff genozip parallel qualimap multiqc bbmap fastp freebayes bedops 
+# Clean extra space
+# conda update -n base conda
+conda clean -y --all" > $JOBNAME.cmds
+# submit the job 
+sbatch --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$JOBNAME.cmds,CONDA_NAME=base ~/bin/serial_jobs_run.slurm
 ```
 
 Download the raw `.fastq.gz` and reference genome files from CloudStor. 
@@ -216,7 +226,7 @@ samtools faidx $GENOME.fa
 <!-- ``` -->
 
 Reads were mapped to the *A. rabiei* reference genome assembled and annotated by the CCDM, Curtin University, (NCBI accession [GCF_004011695.2](https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_004011695.2/)) using bwa-mem2 v2.2.1 [@vasimuddinEfficientArchitectureAwareAcceleration2019]. The alignment files were then coordinate-sorted and PCR duplicates were marked using the `bamsormadup` command from BioBamBam2 v2.0.183 [@tischlerBiobambamToolsRead2014].\
-Mapping quality was assessed with Qualimap v.2.2.2-dev [@okonechnikovQualimapAdvancedMultisample2016] and consolidated along with quality-trimming measures into a single, interactive report for each batch using MultiQC v1.21 [@ewelsMultiQCSummarizeAnalysis2016]. 
+Mapping quality and coverage were assessed with Qualimap v.2.2.2-dev [@okonechnikovQualimapAdvancedMultisample2016] and Mosdepth v0.3.10 [@pedersenMosdepthQuickCoverage2018] and were consolidated along with quality-trimming measures into a single, interactive report for each batch using MultiQC v1.21 [@ewelsMultiQCSummarizeAnalysis2016]. 
 <!-- Samples with less than 20% mapping and x15 coverage were removed from the rest of the analysis (see details in the [MultiQC report](raw_data/QC_11_10_2021_multiqc_report.html)). -->
 
 ```{bash process-align-reads}
@@ -313,7 +323,7 @@ ARRAY_ID=$(sbatch -a 1-$(cat $RUN_DIR/$JOBNAME.cmds | wc -l) --job-name=$JOBNAME
 # merge variants
 ls -1 $RUN_DIR/FB_array_output/ArME14_ctg_*.combined.vcf | parallel --dry-run "printf \"{}\t%s\t%s\t%s\t%s\n\" \$(cat {} | grep -c -v '^#') \$(cat {} | SnpSift filter \"( GEN[?].DP > $MIN_DP ) & ( GEN[?].GT != './.' )\" | gawk '{if (\$0 ~ /^#/ || (length(\$4)==1 && length(\$5)==1)); print \$0}' | grep -c -v '^#') \$(cat {} | SnpSift filter \"( GEN[?].DP > $MIN_DP ) & ( GEN[?].GT != './.' ) & ( QUAL > 20 )\" | gawk '{if (\$0 ~ /^#/ || (length(\$4)==1 && length(\$5)==1)); print \$0}' | grep -c -v '^#') \$(cat {} | SnpSift filter \"( GEN[?].DP > $MIN_DP ) & ( GEN[?].GT != './.' ) & ( QUAL > 30 )\" | gawk '{if (\$0 ~ /^#/ || (length(\$4)==1 && length(\$5)==1)); print \$0}' | grep -c -v '^#') > {}.stats" > ${RUN_DIR}/freebayes-stats.cmds
 JOBNAME="freebayes-merge"
-echo "cat ${RUN_DIR}/freebayes-stats.cmds | parallel && cat $RUN_DIR/FB_array_output/ArME14_ctg_*.combined.vcf | vcffirstheader | vcfstreamsort -w 1000 | vcfuniq > A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid.vcf && bgzip A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid.vcf && tabix A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid.vcf.gz" > $JOBNAME.cmds
+echo "cat ${RUN_DIR}/freebayes-stats.cmds | parallel && cat $RUN_DIR/FB_array_output/ArME14_ctg_*.combined.vcf | vcffirstheader | vcfstreamsort -w 1000 | vcfuniq | bcftools view -O z -W --threads \$SLURM_CPUS_PER_TASK > A_rabiei_2024_Murdoch_WGRS_ArME14_v2.bwa2.fb.diploid.vcf.gz" > $JOBNAME.cmds
 # submit job to cluster
 sbatch --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/serial_jobs_run.slurm
 # combaine stats
@@ -411,7 +421,7 @@ JOBNAME="agrf-initial-gatk"
 find $FQ_DIR -name "*_R1.trimmed.fastq.gz" | parallel -k --dry-run --rpl "{file2} s:_R1:_R2:" --rpl "{sample} s:.+\/(.+?)_R1.+:\1:"  "ALIGN_DIR=$RUN_DIR/aligned_reads && bwa-mem2 mem -R \"@RG\tID:{sample}\tSM:{sample}\tLB:{sample}\tPU:$RGPU\tPL:$RGPL\tPM:$RGPM\tCN:$RGCN\" -t \$[SLURM_CPUS_PER_TASK - 2] $GENOME.fa {} {file2} | bamsormadup tmpfile=\$TMPDIR/bamsormadup_\$(hostname)_\$SLURM_ARRAY_JOB_ID inputformat=sam threads=\$[SLURM_CPUS_PER_TASK - 2] indexfilename=\$ALIGN_DIR/{sample}.dedup.rg.csorted.bam.bai > \$ALIGN_DIR/{sample}.dedup.rg.csorted.bam; gatk --java-options \"-Xmx7g\" HaplotypeCaller -I \$ALIGN_DIR/{sample}.dedup.rg.csorted.bam -R $GENOME.fa -ERC GVCF -O $RUN_DIR/$JOBNAME/{sample}.g.vcf.gz"  > $RUN_DIR/$JOBNAME.cmds
 
 # submit to the cluster
-ARRAY_ID=$(sbatch -a 1-$(cat $RUN_DIR/$JOBNAME.cmds | wc -l) --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/array.slurm | cut -f 4)
+ARRAY_ID=$(sbatch -a 1-$(cat $RUN_DIR/$JOBNAME.cmds | wc -l) --job-name=$JOBNAME --cpus-per-task=$NCORES --mem=${MEM}G --time=$WALLTIME --export=ALL,CMDS_FILE=$RUN_DIR/$JOBNAME.cmds,CONDA_NAME=$CONDA_NAME ~/bin/array.slurm | cut -f 4 -d " ")
 
 # find which jobs failed
 FAILED_TASKS=$(sacct -n -X -j $ARRAY_ID -o state%20,jobid%20 | grep -v COMPLETED | gawk '{print $2}' | cut -d"_" -f2 | paste -sd,)
