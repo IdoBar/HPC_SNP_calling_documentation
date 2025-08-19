@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: Please cite the following works when using this software.
+type: software
+abstract: >-
+  This is the first release synced with the Zenodo repository mirroring this
+  repo.
+
+  It contains the methods and R scripts used in the pipeline to call SNPs from
+  an experimental A. rabiei clonal population, along with the resulting VCF
+  files and their comparative analysis.
+authors:
+  - family-names: Bar
+    given-names: Ido
+  - family-names: Wilson
+    given-names: Hayley
+doi: 10.5281/ZENODO.16901698
+identifiers:
+  - type: doi
+    value: 10.5281/ZENODO.16901698
+  - type: url
+    value: https://zenodo.org/doi/10.5281/zenodo.16901698
+title: >-
+  SNP calling and bioinformatics analysis pipeline for clonal Ascochyta rabiei
+  population
+url: https://zenodo.org/doi/10.5281/zenodo.16901698
+version: v1.0.1
