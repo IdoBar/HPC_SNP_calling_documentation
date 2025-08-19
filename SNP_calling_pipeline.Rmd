@@ -1,6 +1,6 @@
 ---
 title: "_Ascochyta rabiei_ SNP calling from WGRS pipeline"
-author: "Ido Bar & Hayley Wilson"
+author: "Hayley Wilson and Ido Bar"
 date: "`r format(Sys.Date(), '%d %B %Y')`"
 always_allow_html: yes
 output: 

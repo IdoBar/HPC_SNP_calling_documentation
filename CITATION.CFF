@@ -9,10 +9,10 @@ abstract: >-
   an experimental A. rabiei clonal population, along with the resulting VCF
   files and their comparative analysis.
 authors:
+  - family-names: Wilson
+    given-names: Hayley  
   - family-names: Bar
     given-names: Ido
-  - family-names: Wilson
-    given-names: Hayley
 doi: 10.5281/ZENODO.16901698
 identifiers:
   - type: doi
