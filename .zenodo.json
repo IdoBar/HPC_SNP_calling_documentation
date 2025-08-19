@@ -1,0 +1,166 @@
+{
+  "access": {
+    "embargo": {
+      "active": false,
+      "reason": null
+    },
+    "files": "public",
+    "record": "public",
+    "status": "open"
+  },
+  "custom_fields": {
+    "code:codeRepository": "https://github.com/IdoBar/HPC_SNP_calling_documentation",
+    "code:programmingLanguage": [
+      {
+        "id": "r",
+        "title": {
+          "en": "R"
+        }
+      },
+      {
+        "id": "markdown",
+        "title": {
+          "en": "Markdown"
+        }
+      },
+      {
+        "id": "shell",
+        "title": {
+          "en": "Shell"
+        }
+      }
+    ],
+    "thesis:thesis": {
+      "department": "School of Environment and Science",
+      "type": "PhD",
+      "university": "Griffith University"
+    }
+  },
+  "metadata": {
+    "creators": [
+      {
+        "affiliations": [
+          {
+            "name": "Griffith University"
+          }
+        ],
+        "person_or_org": {
+          "family_name": "Bar",
+          "given_name": "Ido",
+          "identifiers": [
+            {
+              "identifier": "0000-0002-2004-4233",
+              "scheme": "orcid"
+            }
+          ],
+          "name": "Bar, Ido",
+          "type": "personal"
+        },
+        "role": {
+          "id": "supervisor",
+          "title": {
+            "de": "SupervisorIn",
+            "en": "Supervisor"
+          }
+        }
+      },
+      {
+        "affiliations": [
+          {
+            "id": "02sc3r913",
+            "identifiers": [
+              {
+                "identifier": "02sc3r913",
+                "scheme": "ror"
+              },
+              {
+                "identifier": "grid.1022.1",
+                "scheme": "grid"
+              },
+              {
+                "identifier": "0000 0004 0437 5432",
+                "scheme": "isni"
+              }
+            ],
+            "name": "Griffith University"
+          }
+        ],
+        "person_or_org": {
+          "family_name": "Wilson",
+          "given_name": "Hayley",
+          "identifiers": [
+            {
+              "identifier": "0000-0001-6541-4464",
+              "scheme": "orcid"
+            }
+          ],
+          "name": "Wilson, Hayley",
+          "type": "personal"
+        },
+        "role": {
+          "id": "researcher",
+          "title": {
+            "de": "WissenschaftlerIn",
+            "en": "Researcher"
+          }
+        }
+      }
+    ],
+    "description": "<p>This is the first release synced with the Zenodo repository mirroring this repo.\nIt contains the methods and R scripts used in the pipeline to call SNPs from an experimental <em>A. rabiei</em> clonal population, along with the resulting <code>VCF</code> files and their comparative analysis.</p>",
+    "funding": [
+      {
+        "award": {
+          "title": {
+            "en": "Investigation into the evolution of increased <em>Ascochyta rabiei</em> aggressiveness against chickpea (Hayley Wilson)"
+          }
+        },
+        "funder": {
+          "id": "050khh066",
+          "name": "New South Wales Department of Primary Industries"
+        }
+      },
+      {
+        "award": {
+          "identifiers": [
+            {
+              "identifier": "https://grdc.com.au/grdc-investments/investments/investment?code=GRI2007-001RTX",
+              "scheme": "url"
+            }
+          ],
+          "number": "GRI2007-001RTX",
+          "title": {
+            "en": "Program 1 - Towards effective genetic and sustainable management of ascochyta blight of chickpea - Ascochyta blight pathogen biology, population dynamics and epidemiology."
+          }
+        },
+        "funder": {
+          "id": "02xwr1996",
+          "name": "Grains Research and Development Corporation"
+        }
+      }
+    ],
+    "resource_type": {
+      "id": "publication-technicalnote",
+      "title": {
+        "de": "Technical Note",
+        "en": "Technical note"
+      }
+    },
+    "rights": [
+      {
+        "description": {
+          "en": "The Creative Commons Attribution license allows re-distribution and re-use of a licensed work on the condition that the creator is appropriately credited."
+        },
+        "icon": "cc-by-icon",
+        "id": "cc-by-4.0",
+        "props": {
+          "scheme": "spdx",
+          "url": "https://creativecommons.org/licenses/by/4.0/legalcode"
+        },
+        "title": {
+          "en": "Creative Commons Attribution 4.0 International"
+        }
+      }
+    ],
+    "title": "SNP calling and bioinformatics analysis pipeline for clonal <em>Ascochyta rabiei</em> population"
+  }
+}
